@@ -1,13 +1,14 @@
 package com.tionix.rms.ui.dashboard
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryFull
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.ListAlt
@@ -20,6 +21,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import com.tionix.rms.models.DeviceStatus
 import com.tionix.rms.models.MockData
@@ -29,16 +32,23 @@ import com.tionix.rms.ui.theme.Dimens
 import com.tionix.rms.ui.theme.ErrorColor
 import com.tionix.rms.ui.theme.WarningColor
 
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.tionix.rms.ui.viewmodels.DashboardViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(
+    viewModel: DashboardViewModel = viewModel(),
+    scannedCode: String? = null,
+    onOpenScanner: () -> Unit
+) {
     var currentRoute by remember { mutableStateOf(bottomNavItems.first().route) }
-    var searchQuery by remember { mutableStateOf("") }
+    val searchQuery by viewModel.searchQuery.collectAsState()
 
     Scaffold(
         topBar = {
             RmsTopAppBar(
-                title = "Dashboard",
+                title = "Home",
                 actions = {
                     IconButton(onClick = { /* Handle Notifications */ }, modifier = Modifier.size(Dimens.touchTargetMin)) {
                         Icon(imageVector = Icons.Default.Notifications, contentDescription = "Notifications")
@@ -78,11 +88,28 @@ fun DashboardScreen() {
                             Spacer(modifier = Modifier.height(Dimens.spacingLarge))
                         }
                         item {
-                            SearchAndScan(searchQuery) { searchQuery = it }
+                            SearchAndScan(
+                                searchQuery = searchQuery, 
+                                onQueryChange = { viewModel.updateSearchQuery(it) },
+                                onScanClick = onOpenScanner
+                            )
                             Spacer(modifier = Modifier.height(Dimens.spacingLarge))
                         }
+                        if (scannedCode != null) {
+                            item {
+                                DashboardCard(title = "Last Scanned Code") {
+                                    Text(
+                                        text = scannedCode!!,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(Dimens.spacingSmall)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(Dimens.spacingLarge))
+                            }
+                        }
                         item {
-                            BarcodeScanCard(onScanClick = { /* Handle Scan */ })
+                            BarcodeScanCard(onScanClick = onOpenScanner)
                             Spacer(modifier = Modifier.height(Dimens.spacingLarge))
                         }
                         item {
@@ -122,11 +149,28 @@ fun DashboardScreen() {
                         Spacer(modifier = Modifier.height(Dimens.spacingLarge))
                     }
                     item {
-                        SearchAndScan(searchQuery) { searchQuery = it }
+                        SearchAndScan(
+                            searchQuery = searchQuery, 
+                            onQueryChange = { viewModel.updateSearchQuery(it) },
+                            onScanClick = onOpenScanner
+                        )
                         Spacer(modifier = Modifier.height(Dimens.spacingLarge))
                     }
+                    if (scannedCode != null) {
+                        item {
+                            DashboardCard(title = "Last Scanned Code") {
+                                Text(
+                                    text = scannedCode!!,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(Dimens.spacingSmall)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(Dimens.spacingLarge))
+                        }
+                    }
                     item {
-                        BarcodeScanCard(onScanClick = { /* Handle Scan */ })
+                        BarcodeScanCard(onScanClick = onOpenScanner)
                         Spacer(modifier = Modifier.height(Dimens.spacingLarge))
                     }
                     item {
@@ -147,12 +191,13 @@ fun DashboardScreen() {
                     }
                 }
             }
+            
         }
     }
 }
 
 @Composable
-fun SearchAndScan(searchQuery: String, onQueryChange: (String) -> Unit) {
+fun SearchAndScan(searchQuery: String, onQueryChange: (String) -> Unit, onScanClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
@@ -164,7 +209,7 @@ fun SearchAndScan(searchQuery: String, onQueryChange: (String) -> Unit) {
         )
         Spacer(modifier = Modifier.width(Dimens.spacingSmall))
         FilledIconButton(
-            onClick = { /* Open Scanner */ },
+            onClick = onScanClick,
             modifier = Modifier
                 .size(56.dp)
                 .defaultMinSize(minWidth = Dimens.touchTargetMin, minHeight = Dimens.touchTargetMin),
@@ -254,7 +299,7 @@ fun WelcomeSection(userName: String) {
         )
         Text(
             text = userName,
-            style = MaterialTheme.typography.displayLarge,
+            style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onSurface
         )
     }
@@ -264,14 +309,17 @@ fun WelcomeSection(userName: String) {
 fun SystemInfoSection(deviceStatus: DeviceStatus) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = Dimens.elevationSubtle)
     ) {
-        Column(modifier = Modifier.padding(Dimens.spacingMedium)) {
+        Column(modifier = Modifier.padding(Dimens.spacingLarge)) {
             Text(
                 text = "System Status",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(Dimens.spacingMedium))
             
@@ -313,12 +361,12 @@ fun StatusBadge(icon: androidx.compose.ui.graphics.vector.ImageVector, label: St
             imageVector = icon,
             contentDescription = null,
             tint = color,
-            modifier = Modifier.size(Dimens.iconSizeMedium)
+            modifier = Modifier.size(28.dp)
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

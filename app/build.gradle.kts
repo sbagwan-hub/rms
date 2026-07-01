@@ -19,6 +19,10 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        ndk {
+            abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
+        }
     }
 
     buildTypes {
@@ -35,6 +39,11 @@ android {
     buildFeatures {
         compose = true
     }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
 }
 
 dependencies {
@@ -47,6 +56,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
@@ -54,4 +64,16 @@ dependencies {
     androidTestImplementation(libs.androidx.junit)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
+    
+    // CameraX
+    val cameraxVersion = "1.3.1"
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+    
+    // ML Kit Barcode Scanning
+    implementation("com.google.mlkit:barcode-scanning:17.2.0")
+    
+    // Accompanist Permissions
+    implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 }

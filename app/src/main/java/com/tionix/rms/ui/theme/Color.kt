@@ -2,8 +2,8 @@ package com.tionix.rms.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val PrimaryColor = Color(0xFF0F766E)
-val PrimaryContainerColor = Color(0xFFCCFBF1)
+val PrimaryColor = Color(0xFF99F6E4)
+val PrimaryContainerColor = Color(0xFF115E59)
 val BackgroundColor = Color(0xFFF8FAFC)
 val SurfaceColor = Color(0xFFFFFFFF)
 val TextPrimaryColor = Color(0xFF111827)

@@ -56,3 +56,42 @@ fun RmsSearchBar(
         )
     )
 }
+
+@Composable
+fun RmsOutlinedTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    leadingIcon: @Composable (() -> Unit)? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    visualTransformation: androidx.compose.ui.text.input.VisualTransformation = androidx.compose.ui.text.input.VisualTransformation.None,
+    keyboardOptions: androidx.compose.foundation.text.KeyboardOptions = androidx.compose.foundation.text.KeyboardOptions.Default
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier
+            .fillMaxWidth()
+            .defaultMinSize(minHeight = Dimens.touchTargetMin),
+        placeholder = {
+            Text(text = placeholder, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f))
+        },
+        leadingIcon = leadingIcon,
+        trailingIcon = trailingIcon,
+        singleLine = true,
+        visualTransformation = visualTransformation,
+        keyboardOptions = keyboardOptions,
+        shape = MaterialTheme.shapes.medium, // Rounded corners matching the design
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = MaterialTheme.colorScheme.primary,
+            unfocusedBorderColor = MaterialTheme.colorScheme.primary, // The mockup shows dark borders even when unfocused
+            focusedContainerColor = Color.Transparent,
+            unfocusedContainerColor = Color.Transparent,
+            focusedLeadingIconColor = MaterialTheme.colorScheme.primary,
+            unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            focusedTrailingIconColor = MaterialTheme.colorScheme.primary,
+            unfocusedTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    )
+}

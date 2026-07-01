@@ -47,7 +47,7 @@ private val DarkColorScheme = darkColorScheme(
 
 @Composable
 fun RMSTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = false, // Force light mode
     dynamicColor: Boolean = false, // Disable dynamic color to strictly follow enterprise palette
     content: @Composable () -> Unit
 ) {
@@ -68,9 +68,12 @@ fun RMSTheme(
         }
     }
 
+    val configuration = LocalContext.current.resources.configuration
+    val responsiveTypography = getResponsiveTypography(configuration.screenWidthDp)
+
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = Typography,
+        typography = responsiveTypography,
         shapes = Shapes,
         content = content
     )
