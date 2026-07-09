@@ -12,13 +12,13 @@ import retrofit2.http.Path
 interface TransferApiService {
     @GET("transfers/assigned")
     suspend fun getAssignedTransfers(): Response<List<TransferDto>>
-    
-    @POST("transfers/start")
+
+    @POST("transfers")
     suspend fun startTransfer(@Body request: StartTransferRequestDto): Response<TransferDto>
-    
+
     @PUT("transfers/{id}/complete")
     suspend fun completeTransfer(@Path("id") id: String): Response<Unit>
-    
+
     @GET("transfers/scan/{barcode}")
     suspend fun scanBox(@Path("barcode") barcode: String): Response<TransferDto?>
 }

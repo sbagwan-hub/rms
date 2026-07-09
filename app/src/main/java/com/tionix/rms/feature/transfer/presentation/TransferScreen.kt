@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -231,7 +232,7 @@ private fun TransferCard(
                 )
             }
             
-            if (transfer.status == TransferStatus.IN_PROGRESS) {
+            if (transfer.status == TransferStatus.ACCEPTED) {
                 Button(
                     onClick = onComplete,
                     modifier = Modifier.fillMaxWidth()
@@ -248,10 +249,10 @@ private fun TransferCard(
 @Composable
 private fun StatusBadge(status: TransferStatus) {
     val (color, label) = when (status) {
-        TransferStatus.PENDING -> MaterialTheme.colorScheme.tertiary to "Pending"
-        TransferStatus.IN_PROGRESS -> MaterialTheme.colorScheme.secondary to "In Progress"
+        TransferStatus.PENDING_ACCEPTANCE -> MaterialTheme.colorScheme.tertiary to "Pending Acceptance"
+        TransferStatus.ACCEPTED -> MaterialTheme.colorScheme.secondary to "Accepted"
         TransferStatus.COMPLETED -> Color(0xFF4CAF50) to "Completed"
-        TransferStatus.FAILED -> MaterialTheme.colorScheme.error to "Failed"
+        TransferStatus.REJECTED -> MaterialTheme.colorScheme.error to "Rejected"
     }
     
     Surface(

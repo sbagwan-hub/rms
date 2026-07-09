@@ -16,8 +16,8 @@ data class Transfer(
 )
 
 enum class TransferStatus {
-    PENDING,
-    IN_PROGRESS,
+    PENDING_ACCEPTANCE,
+    ACCEPTED,
     COMPLETED,
-    FAILED
+    REJECTED
 }
