@@ -1,6 +1,8 @@
 package com.tionix.rms.feature.search.data.repository
 
 import com.tionix.rms.feature.search.data.remote.SearchApiService
+import com.tionix.rms.feature.search.data.remote.dto.toDomain
+import com.tionix.rms.feature.search.domain.model.BoxDetail
 import com.tionix.rms.feature.search.domain.model.SearchResult
 import com.tionix.rms.feature.search.domain.repository.SearchRepository
 import com.tionix.rms.feature.search.domain.repository.SearchType
@@ -34,5 +36,10 @@ class SearchRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    override suspend fun getBoxDetail(boxId: String): Result<BoxDetail> {
+        // TODO: Add getBoxDetail endpoint to SearchApiService when backend is ready
+        return Result.failure(UnsupportedOperationException("getBoxDetail endpoint not yet available"))
     }
 }

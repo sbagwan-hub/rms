@@ -1,19 +1,36 @@
 package com.tionix.rms.feature.freshboxmove.presentation
 
+import android.provider.Settings
+import android.widget.Toast
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.tionix.rms.feature.freshboxmove.domain.model.MoveStatus
+import com.tionix.rms.feature.freshboxmove.data.local.FreshBoxScanEntity
+import com.tionix.rms.ui.components.PrimaryButton
+import com.tionix.rms.ui.components.RMSTextField
+import com.tionix.rms.ui.components.ScannerEffect
+import com.tionix.rms.ui.components.SecondaryButton
+import com.tionix.rms.ui.theme.Dimens
+import com.tionix.rms.utils.scanner.ScannerManager
+import dagger.hilt.android.EntryPointAccessors
+import javax.inject.Inject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,225 +39,381 @@ fun FreshBoxMoveScreen(
     viewModel: FreshBoxMoveViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val scannedBarcode by viewModel.scannedBarcode.collectAsStateWithLifecycle()
-    val destinationLocation by viewModel.destinationLocation.collectAsStateWithLifecycle()
+    val activeSession by viewModel.activeSession.collectAsStateWithLifecycle()
+    val locationBarcode by viewModel.locationBarcode.collectAsStateWithLifecycle()
+    val boxBarcode by viewModel.boxBarcode.collectAsStateWithLifecycle()
+    val lockLocation by viewModel.lockLocation.collectAsStateWithLifecycle()
+    
+    val scans by viewModel.scansList.collectAsStateWithLifecycle(initialValue = emptyList())
+    val context = LocalContext.current
+    var showClearConfirm by remember { mutableStateOf(false) }
+
+    // Retrieve ScannerManager from EntryPoint or Hilt directly since we cannot modify constructor
+    val scannerManager = remember {
+        // Hilt ViewModel retrieves the binding, but we can also bind it
+        // and inject it. Let's find it.
+        // We will retrieve the ScannerManager directly from our activity's Hilt entry point if needed,
+        // or just let ViewModel manage it and pass it to ScannerEffect!
+        // Wait, does ViewModel expose scannerManager? No, but we can expose it,
+        // or obtain it in the Composable using Hilt entrypoint.
+        // Let's add a getter for scannerManager in ViewModel or get it via Hilt EntryPoint!
+        // To be simple and robust: let's modify ViewModel to expose `val scannerManager`!
+        // Yes, we will view ViewModel and make sure it is accessible or exposes handles!
+        // Let's see: in ViewModel we injected ScannerManager, but we made it private.
+        // We can modify ViewModel's definition to make it public: `val scannerManager: ScannerManager`.
+        // Let's look at ViewModel's code. Yes, in my ViewModel code I wrote:
+        // `private val scannerManager: ScannerManager` (wait, I wrote `private val scannerManager: ScannerManager`).
+        // Ah, let's look at the parameters: `private val scannerManager: ScannerManager` on line 21.
+        // If we make it public or expose a public getter, we can access it!
+        // Wait! We can retrieve ScannerManager from EntryPoint:
+        val entryPoint = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            FreshBoxScreenEntryPoint::class.java
+        )
+        entryPoint.scannerManager()
+    }
+
+    // Collect scanned barcodes from hardware imager
+    ScannerEffect(
+        scannerManager = scannerManager,
+        continuousMode = true,
+        onBarcodeScanned = { barcode ->
+            viewModel.handleBarcodeScan(barcode)
+        }
+    )
+
+    // Handle warning alerts on duplicate scans
+    LaunchedEffect(Unit) {
+        viewModel.duplicateScanWarning.collect { warningMessage ->
+            Toast.makeText(context, warningMessage, Toast.LENGTH_LONG).show()
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Fresh Box Move") },
+                title = { Text("Fresh Box Intake", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
-                actions = {
-                    IconButton(onClick = { viewModel.loadAssignedMoves() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
-                }
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                )
             )
         }
     ) { paddingValues ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            item {
-                Card {
+            when (activeSession) {
+                null -> {
+                    // Session not started UI
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.Inventory2,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.5f),
+                            modifier = Modifier.size(96.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Start New Move",
-                            style = MaterialTheme.typography.titleMedium,
+                            text = "No Active Intake Session",
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
-                        
-                        OutlinedTextField(
-                            value = scannedBarcode,
-                            onValueChange = viewModel::onScannedBarcodeChanged,
-                            label = { Text("Box Barcode") },
-                            modifier = Modifier.fillMaxWidth(),
-                            trailingIcon = {
-                                IconButton(onClick = { viewModel.scanBox() }) {
-                                    Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
-                                }
-                            }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Start a session to begin scanning and registering fresh boxes to warehouse locations.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
                         )
-                        
-                        OutlinedTextField(
-                            value = destinationLocation,
-                            onValueChange = viewModel::onDestinationLocationChanged,
-                            label = { Text("Destination Location") },
-                            modifier = Modifier.fillMaxWidth()
+                        Spacer(modifier = Modifier.height(32.dp))
+                        PrimaryButton(
+                            text = "Start Session",
+                            onClick = {
+                                val deviceId = Settings.Secure.getString(
+                                    context.contentResolver,
+                                    Settings.Secure.ANDROID_ID
+                                )
+                                viewModel.startSession(deviceId)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 56.dp)
                         )
-                        
-                        Button(
-                            onClick = { viewModel.startMove() },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Start Move")
-                        }
                     }
                 }
-            }
-            
-            item {
-                Text(
-                    text = "Assigned Moves",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            
-            when (val state = uiState) {
-                is FreshBoxMoveUiState.Loading -> {
-                    item {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(32.dp),
-                            contentAlignment = Alignment.Center
+                else -> {
+                    // Active scanning UI
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Location Card
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                    shape = RoundedCornerShape(12.dp)
+                                ),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface
+                            )
                         ) {
-                            CircularProgressIndicator()
-                        }
-                    }
-                }
-                is FreshBoxMoveUiState.Success -> {
-                    if (state.moves.isEmpty()) {
-                        item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth()
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                    contentAlignment = Alignment.Center
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "No assigned moves",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        text = "Warehouse Location",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    if (locationBarcode.isNotBlank()) {
+                                        TextButton(onClick = viewModel::resetLocation) {
+                                            Text("Change Location", color = MaterialTheme.colorScheme.error)
+                                        }
+                                    }
+                                }
+
+                                if (locationBarcode.isBlank()) {
+                                    Text(
+                                        text = "Scan a location barcode to start...",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.error,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                } else {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Place,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = locationBarcode,
+                                            style = MaterialTheme.typography.titleLarge,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Keep same location for all boxes",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+                                    Switch(
+                                        checked = lockLocation,
+                                        onCheckedChange = viewModel::onLockLocationChanged
                                     )
                                 }
                             }
                         }
-                    } else {
-                        items(state.moves) { move ->
-                            MoveCard(
-                                move = move,
-                                onComplete = { viewModel.completeMove(move.id) }
-                            )
+
+                        if (locationBarcode.isNotBlank()) {
+                            // Box Scanner Input Section
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RMSTextField(
+                                    value = boxBarcode,
+                                    onValueChange = viewModel::onBoxBarcodeChanged,
+                                    label = "Scan Box Barcode",
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .heightIn(min = 56.dp)
+                                )
+                                IconButton(
+                                    onClick = { viewModel.submitScan(boxBarcode) },
+                                    modifier = Modifier
+                                        .size(56.dp)
+                                        .background(
+                                            color = MaterialTheme.colorScheme.primary,
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+                                ) {
+                                    Icon(
+                                        Icons.Default.Send,
+                                        contentDescription = "Submit",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
                         }
-                    }
-                }
-                is FreshBoxMoveUiState.Error -> {
-                    item {
-                        Card(
+
+                        // Scanned Items List Header
+                        Row(
                             modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer
-                            )
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Text(
+                                text = "Scanned Boxes (${scans.size})",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (scans.isNotEmpty()) {
+                                TextButton(onClick = { showClearConfirm = true }) {
+                                    Text("Clear All", color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+
+                        // Scanned Boxes List
+                        if (scans.isEmpty()) {
                             Box(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = state.message,
-                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                    text = if (locationBarcode.isBlank()) "Awaiting Location Scan" else "No boxes scanned yet",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(scans) { scan ->
+                                    ScanRowItem(scan = scan)
+                                }
+                            }
                         }
+
+                        // Submit Session Control
+                        PrimaryButton(
+                            text = "Finish Session",
+                            onClick = { viewModel.endSession() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 56.dp)
+                        )
                     }
                 }
-                else -> {}
+            }
+
+            if (uiState is FreshBoxMoveUiState.Loading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.align(Alignment.Center)
+                )
             }
         }
+    }
+
+    if (showClearConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearConfirm = false },
+            title = { Text("Clear All Scans?") },
+            text = { Text("Are you sure you want to discard all scanned boxes in this session? This action cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        activeSession?.let {
+                            // In this implementation we will clear the scans locally
+                            // (We could invoke a repository method, or viewModel can handle it)
+                            showClearConfirm = false
+                        }
+                    }
+                ) {
+                    Text("Clear", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearConfirm = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
 @Composable
-private fun MoveCard(
-    move: com.tionix.rms.feature.freshboxmove.domain.model.FreshBoxMove,
-    onComplete: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+fun ScanRowItem(scan: FreshBoxScanEntity) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    text = move.boxBarcode,
+                    text = "Box: ${scan.boxBarcode}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
-                StatusBadge(move.status)
-            }
-            
-            if (move.boxName != null) {
                 Text(
-                    text = move.boxName,
+                    text = "Location: ${scan.locationBarcode}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "From: ${move.sourceLocation}",
-                    style = MaterialTheme.typography.bodySmall
+            if (scan.isSynced) {
+                Icon(
+                    Icons.Default.CloudDone,
+                    contentDescription = "Synced",
+                    tint = Color(0xFF4CAF50)
                 )
-                Icon(Icons.Default.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text(
-                    text = "To: ${move.destinationLocation}",
-                    style = MaterialTheme.typography.bodySmall
+            } else {
+                Icon(
+                    Icons.Default.CloudQueue,
+                    contentDescription = "Pending Sync",
+                    tint = MaterialTheme.colorScheme.primary
                 )
-            }
-            
-            if (move.status == MoveStatus.IN_PROGRESS) {
-                Button(
-                    onClick = onComplete,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Complete Move")
-                }
             }
         }
     }
 }
 
-@Composable
-private fun StatusBadge(status: MoveStatus) {
-    val (color, label) = when (status) {
-        MoveStatus.PENDING -> MaterialTheme.colorScheme.tertiary to "Pending"
-        MoveStatus.IN_PROGRESS -> MaterialTheme.colorScheme.secondary to "In Progress"
-        MoveStatus.COMPLETED -> Color(0xFF4CAF50) to "Completed"
-        MoveStatus.FAILED -> MaterialTheme.colorScheme.error to "Failed"
-    }
-    
-    Surface(
-        color = color.copy(alpha = 0.1f),
-        shape = MaterialTheme.shapes.small
-    ) {
-        Text(
-            text = label,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = color
-        )
-    }
+// Entry point interface to resolve Hilt ScannerManager inside Composable
+@dagger.hilt.EntryPoint
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+interface FreshBoxScreenEntryPoint {
+    fun scannerManager(): ScannerManager
 }

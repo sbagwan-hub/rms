@@ -11,26 +11,32 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.tionix.rms.ui.theme.PrimaryBlue
-import com.tionix.rms.ui.theme.Surface
-import kotlinx.coroutines.delay
-
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun SplashScreen(
-    onNavigateToLogin: () -> Unit
+    onNavigateToLogin: () -> Unit,
+    onNavigateToDashboard: () -> Unit,
+    viewModel: SplashViewModel = hiltViewModel()
 ) {
-    LaunchedEffect(key1 = true) {
-        delay(2000) // Simulate loading/initialization
-        onNavigateToLogin()
+    val destination by viewModel.destination.collectAsStateWithLifecycle()
+
+    LaunchedEffect(destination) {
+        when (destination) {
+            SplashDestination.Login -> onNavigateToLogin()
+            SplashDestination.Dashboard -> onNavigateToDashboard()
+            SplashDestination.Loading -> Unit
+        }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(PrimaryBlue),
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -39,11 +45,11 @@ fun SplashScreen(
             Text(
                 text = "ENTERPRISE RMS",
                 style = MaterialTheme.typography.displayLarge,
-                color = Surface
+                color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(24.dp))
             CircularProgressIndicator(
-                color = Surface
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }

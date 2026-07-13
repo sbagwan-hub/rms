@@ -3,8 +3,9 @@ package com.tionix.rms.feature.transfer.domain.usecase
 import com.tionix.rms.feature.transfer.domain.model.Transfer
 import com.tionix.rms.feature.transfer.domain.model.StartTransferRequest
 import com.tionix.rms.feature.transfer.domain.repository.TransferRepository
+import javax.inject.Inject
 
-class StartTransferUseCase(private val repository: TransferRepository) {
+class StartTransferUseCase @Inject constructor(private val repository: TransferRepository) {
     suspend operator fun invoke(request: StartTransferRequest): Result<Transfer> {
         return repository.startTransfer(request)
     }

@@ -12,7 +12,24 @@ data class InventoryVerification(
     val assignedTo: String,
     val startedAt: String?,
     val completedAt: String?,
-    val createdAt: String
+    val createdAt: String,
+    val expectedBoxes: List<Box> = emptyList(),
+    val scannedBoxes: List<ScannedBox> = emptyList()
+)
+
+data class Box(
+    val id: String,
+    val barcode: String,
+    val description: String,
+    val currentLocation: String,
+    val expectedLocation: String,
+    val status: BoxStatus = BoxStatus.PENDING
+)
+
+data class ScannedBox(
+    val barcode: String,
+    val scanStatus: ScanStatus,
+    val timestamp: String
 )
 
 enum class VerificationStatus {
@@ -20,4 +37,17 @@ enum class VerificationStatus {
     IN_PROGRESS,
     COMPLETED,
     FAILED
+}
+
+enum class BoxStatus {
+    PENDING,
+    VERIFIED,
+    MISSING,
+    UNEXPECTED
+}
+
+enum class ScanStatus {
+    VERIFIED,
+    UNEXPECTED,
+    DUPLICATE
 }

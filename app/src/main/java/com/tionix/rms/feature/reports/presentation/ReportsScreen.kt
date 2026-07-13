@@ -99,7 +99,7 @@ private fun ReportsContent(
                 
                 var expanded by remember { mutableStateOf(false) }
                 Box {
-                    Button(onClick = { expanded = true }, variant = ButtonDefaults.outlinedButtonVariant) {
+                    OutlinedButton(onClick = { expanded = true }) {
                         Text(selectedReportType?.name ?: "All Types")
                         Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                     }

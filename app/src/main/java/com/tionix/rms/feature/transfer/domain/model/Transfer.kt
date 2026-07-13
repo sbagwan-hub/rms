@@ -15,6 +15,44 @@ data class Transfer(
     val createdAt: String
 )
 
+enum class TransferType {
+    BOX_TO_LOCATION,
+    BOX_TO_WAREHOUSE
+}
+
+data class TransferItem(
+    val id: String,
+    val barcode: String,
+    val name: String,
+    val currentLocation: String,
+    val itemType: ItemType
+)
+
+enum class ItemType {
+    BOX,
+    FILE
+}
+
+data class TransferSession(
+    val id: String,
+    val sessionId: String,
+    val transferType: TransferType,
+    val sourceItems: List<TransferItem>,
+    val destination: String,
+    val status: SessionStatus,
+    val startTime: String,
+    val endTime: String?
+)
+
+enum class SessionStatus {
+    SELECTING_TYPE,
+    SCANNING_SOURCE,
+    SELECTING_DESTINATION,
+    REVIEWING,
+    SUBMITTED,
+    QUEUED_OFFLINE
+}
+
 enum class TransferStatus {
     PENDING_ACCEPTANCE,
     ACCEPTED,

@@ -1,6 +1,7 @@
 package com.tionix.rms.feature.notifications.data.repository
 
 import com.tionix.rms.feature.notifications.data.remote.NotificationsApiService
+import com.tionix.rms.feature.notifications.data.remote.dto.toDomain
 import com.tionix.rms.feature.notifications.domain.model.Notification
 import com.tionix.rms.feature.notifications.domain.repository.NotificationsRepository
 import javax.inject.Inject

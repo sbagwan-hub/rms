@@ -9,4 +9,7 @@ sealed class TransferUiState {
     data class BoxScanned(val transfer: Transfer?) : TransferUiState()
     object TransferStarted : TransferUiState()
     object TransferCompleted : TransferUiState()
+    object SessionStarted : TransferUiState()
+    object TransferSubmitted : TransferUiState()
+    object TransferQueued : TransferUiState()
 }

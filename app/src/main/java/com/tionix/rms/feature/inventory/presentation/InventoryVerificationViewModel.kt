@@ -2,9 +2,17 @@ package com.tionix.rms.feature.inventory.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tionix.rms.feature.inventory.domain.model.Box
+import com.tionix.rms.feature.inventory.domain.model.BoxStatus
+import com.tionix.rms.feature.inventory.domain.model.InventoryVerification
+import com.tionix.rms.feature.inventory.domain.model.ScannedBox
+import com.tionix.rms.feature.inventory.domain.model.ScanStatus
 import com.tionix.rms.feature.inventory.domain.model.StartVerificationRequest
 import com.tionix.rms.feature.inventory.domain.repository.InventoryVerificationRepository
+import com.tionix.rms.feature.inventory.domain.usecase.CompleteVerificationUseCase
+import com.tionix.rms.feature.inventory.domain.usecase.GetExpectedBoxesUseCase
 import com.tionix.rms.feature.inventory.domain.usecase.StartVerificationUseCase
+import com.tionix.rms.feature.inventory.domain.usecase.VerifyBoxUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +23,10 @@ import javax.inject.Inject
 @HiltViewModel
 class InventoryVerificationViewModel @Inject constructor(
     private val repository: InventoryVerificationRepository,
-    private val startVerificationUseCase: StartVerificationUseCase
+    private val startVerificationUseCase: StartVerificationUseCase,
+    private val getExpectedBoxesUseCase: GetExpectedBoxesUseCase,
+    private val verifyBoxUseCase: VerifyBoxUseCase,
+    private val completeVerificationUseCase: CompleteVerificationUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<InventoryVerificationUiState>(InventoryVerificationUiState.Loading)
@@ -26,6 +37,18 @@ class InventoryVerificationViewModel @Inject constructor(
 
     private val _scannedBarcode = MutableStateFlow("")
     val scannedBarcode: StateFlow<String> = _scannedBarcode.asStateFlow()
+
+    private val _expectedBoxes = MutableStateFlow<List<Box>>(emptyList())
+    val expectedBoxes: StateFlow<List<Box>> = _expectedBoxes.asStateFlow()
+
+    private val _scannedBoxes = MutableStateFlow<List<ScannedBox>>(emptyList())
+    val scannedBoxes: StateFlow<List<ScannedBox>> = _scannedBoxes.asStateFlow()
+
+    private val _currentVerification = MutableStateFlow<InventoryVerification?>(null)
+    val currentVerification: StateFlow<InventoryVerification?> = _currentVerification.asStateFlow()
+
+    private val _showDiscrepancyDialog = MutableStateFlow(false)
+    val showDiscrepancyDialog: StateFlow<Boolean> = _showDiscrepancyDialog.asStateFlow()
 
     init {
         loadAssignedVerifications()
@@ -66,34 +89,127 @@ class InventoryVerificationViewModel @Inject constructor(
             )
             
             if (result.isSuccess) {
+                _currentVerification.value = result.getOrNull()
                 _uiState.value = InventoryVerificationUiState.VerificationStarted
-                loadAssignedVerifications()
+                loadExpectedBoxes()
             } else {
                 _uiState.value = InventoryVerificationUiState.Error(result.exceptionOrNull()?.message ?: "Failed to start verification")
             }
         }
     }
 
-    fun scanBox(verificationId: String) {
+    private fun loadExpectedBoxes() {
         viewModelScope.launch {
-            val result = repository.scanBox(_scannedBarcode.value, verificationId)
+            val locationId = _currentVerification.value?.locationId ?: _selectedLocationId.value
+            val result = getExpectedBoxesUseCase(locationId)
+            
             if (result.isSuccess) {
+                _expectedBoxes.value = result.getOrNull() ?: emptyList()
+            } else {
+                _uiState.value = InventoryVerificationUiState.Error(result.exceptionOrNull()?.message ?: "Failed to load expected boxes")
+            }
+        }
+    }
+
+    fun verifyBox(barcode: String) {
+        viewModelScope.launch {
+            val verificationId = _currentVerification.value?.id ?: return@launch
+            
+            val result = verifyBoxUseCase(barcode, verificationId)
+            if (result.isSuccess) {
+                val scannedBox = result.getOrNull()!!
+                _scannedBoxes.value = _scannedBoxes.value + scannedBox
                 _uiState.value = InventoryVerificationUiState.BoxScanned
+                
+                // Update box status in expected boxes
+                updateBoxStatus(barcode, scannedBox.scanStatus)
             } else {
                 _uiState.value = InventoryVerificationUiState.Error(result.exceptionOrNull()?.message ?: "Scan failed")
             }
         }
     }
 
-    fun completeVerification(verificationId: String) {
+    private fun updateBoxStatus(barcode: String, scanStatus: ScanStatus) {
+        _expectedBoxes.value = _expectedBoxes.value.map { box ->
+            if (box.barcode == barcode) {
+                when (scanStatus) {
+                    ScanStatus.VERIFIED -> box.copy(status = BoxStatus.VERIFIED)
+                    ScanStatus.UNEXPECTED -> box.copy(status = BoxStatus.UNEXPECTED)
+                    ScanStatus.DUPLICATE -> box
+                }
+            } else {
+                box
+            }
+        }
+    }
+
+    fun prepareForSubmit() {
+        _showDiscrepancyDialog.value = true
+    }
+
+    fun dismissDiscrepancyDialog() {
+        _showDiscrepancyDialog.value = false
+    }
+
+    fun completeVerification() {
         viewModelScope.launch {
-            val result = repository.completeVerification(verificationId)
+            val verificationId = _currentVerification.value?.id ?: return@launch
+            
+            val result = completeVerificationUseCase(verificationId)
             if (result.isSuccess) {
+                _showDiscrepancyDialog.value = false
                 _uiState.value = InventoryVerificationUiState.VerificationCompleted
+                _currentVerification.value = null
+                _expectedBoxes.value = emptyList()
+                _scannedBoxes.value = emptyList()
                 loadAssignedVerifications()
             } else {
                 _uiState.value = InventoryVerificationUiState.Error(result.exceptionOrNull()?.message ?: "Failed to complete verification")
             }
         }
+    }
+
+    fun completeVerification(verificationId: String) {
+        viewModelScope.launch {
+            _uiState.value = InventoryVerificationUiState.Loading
+            val result = completeVerificationUseCase(verificationId)
+            if (result.isSuccess) {
+                loadAssignedVerifications()
+            } else {
+                _uiState.value = InventoryVerificationUiState.Error(result.exceptionOrNull()?.message ?: "Failed to complete verification")
+            }
+        }
+    }
+
+    fun resumeVerification(verification: InventoryVerification) {
+        _currentVerification.value = verification
+        _uiState.value = InventoryVerificationUiState.VerificationStarted
+        loadExpectedBoxes()
+    }
+
+    fun exitVerification() {
+        _currentVerification.value = null
+        _expectedBoxes.value = emptyList()
+        _scannedBoxes.value = emptyList()
+        loadAssignedVerifications()
+    }
+
+    fun getProgress(): Int {
+        val expectedCount = _expectedBoxes.value.size
+        if (expectedCount == 0) return 0
+        val verifiedCount = _expectedBoxes.value.count { it.status == BoxStatus.VERIFIED }
+        return (verifiedCount * 100) / expectedCount
+    }
+
+    fun getVerifiedCount(): Int {
+        return _expectedBoxes.value.count { it.status == BoxStatus.VERIFIED }
+    }
+
+    fun getMissingCount(): Int {
+        return _expectedBoxes.value.count { it.status == BoxStatus.MISSING }
+    }
+
+    fun getUnexpectedCount(): Int {
+        return _expectedBoxes.value.count { it.status == BoxStatus.UNEXPECTED }
     }
 }

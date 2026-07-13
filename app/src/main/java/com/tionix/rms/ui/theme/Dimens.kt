@@ -7,8 +7,8 @@ object Dimens {
     val spacingMedium = 16.dp
     val spacingLarge = 24.dp
     
-    val cornerRadius = 12.dp
-    val cornerRadiusLarge = 16.dp
+    val cornerRadius = 14.dp
+    val cornerRadiusLarge = 14.dp
     
     val touchTargetMin = 48.dp
     val iconSizeSmall = 20.dp

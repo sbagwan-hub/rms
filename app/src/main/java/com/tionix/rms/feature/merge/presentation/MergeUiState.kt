@@ -9,4 +9,6 @@ sealed class MergeUiState {
     data class BoxScanned(val merge: Merge?) : MergeUiState()
     object MergeStarted : MergeUiState()
     object MergeCompleted : MergeUiState()
+    object SessionStarted : MergeUiState()
+    data class DuplicateError(val message: String) : MergeUiState()
 }

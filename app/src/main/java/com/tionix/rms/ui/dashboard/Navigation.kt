@@ -4,18 +4,17 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.tionix.rms.ui.navigation.RmsRoutes
 import com.tionix.rms.ui.theme.Dimens
 
 data class BottomNavItem(
@@ -25,10 +24,10 @@ data class BottomNavItem(
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem("Home", Icons.Default.Home, "home"),
-    BottomNavItem("Scan", Icons.Default.QrCodeScanner, "scan"),
-    BottomNavItem("Tasks", Icons.Default.List, "tasks"),
-    BottomNavItem("Profile", Icons.Default.Person, "profile")
+    BottomNavItem("Home", Icons.Default.Home, RmsRoutes.HOME),
+    BottomNavItem("Search", Icons.Default.Search, RmsRoutes.SEARCH),
+    BottomNavItem("Reports", Icons.Default.Assessment, RmsRoutes.REPORTS),
+    BottomNavItem("Profile", Icons.Default.Person, RmsRoutes.PROFILE)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)

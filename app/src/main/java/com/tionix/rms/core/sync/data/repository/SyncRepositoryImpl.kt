@@ -3,8 +3,6 @@ package com.tionix.rms.core.sync.data.repository
 import android.content.Context
 import com.tionix.rms.core.sync.data.local.SyncDatabase
 import com.tionix.rms.core.sync.data.local.SyncOperationEntity
-import com.tionix.rms.core.sync.data.local.toDomain
-import com.tionix.rms.core.sync.data.local.toEntity
 import com.tionix.rms.core.sync.domain.model.SyncOperation
 import com.tionix.rms.core.sync.domain.model.SyncOperationStatus
 import com.tionix.rms.core.sync.domain.model.SyncStatus

@@ -1,7 +1,11 @@
 package com.tionix.rms.feature.merge.data.repository
 
 import com.tionix.rms.feature.merge.data.remote.MergeApiService
+import com.tionix.rms.feature.merge.data.remote.dto.toDomain
+import com.tionix.rms.feature.merge.data.remote.dto.toDto
+import com.tionix.rms.feature.merge.domain.model.Box
 import com.tionix.rms.feature.merge.domain.model.Merge
+import com.tionix.rms.feature.merge.domain.model.MergeSession
 import com.tionix.rms.feature.merge.domain.model.StartMergeRequest
 import com.tionix.rms.feature.merge.domain.repository.MergeRepository
 import javax.inject.Inject
@@ -60,5 +64,31 @@ class MergeRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    // Session management — handled locally in use-case layer
+
+    override suspend fun startMergeSession(): Result<MergeSession> {
+        return Result.failure(UnsupportedOperationException("Session management is local"))
+    }
+
+    override suspend fun scanDestinationBox(barcode: String): Result<Box> {
+        return Result.failure(UnsupportedOperationException("Session management is local"))
+    }
+
+    override suspend fun scanSourceBox(sessionId: String, barcode: String): Result<Box> {
+        return Result.failure(UnsupportedOperationException("Session management is local"))
+    }
+
+    override suspend fun removeSourceBox(sessionId: String, boxBarcode: String): Result<Unit> {
+        return Result.failure(UnsupportedOperationException("Session management is local"))
+    }
+
+    override suspend fun submitMerge(sessionId: String): Result<Unit> {
+        return Result.failure(UnsupportedOperationException("Use completeMerge with mergeId"))
+    }
+
+    override suspend fun syncMergeToQueue(sessionId: String): Result<Unit> {
+        return Result.failure(UnsupportedOperationException("Not yet implemented"))
     }
 }

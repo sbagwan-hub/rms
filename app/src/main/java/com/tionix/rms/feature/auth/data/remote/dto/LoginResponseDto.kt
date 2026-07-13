@@ -8,8 +8,7 @@ data class LoginResponseDto(
 
 data class UserDto(
     val id: String,
-    val username: String,
+    val fullName: String,
     val email: String,
-    val companyId: String,
-    val deviceId: String
+    val role: String
 )

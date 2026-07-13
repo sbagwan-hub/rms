@@ -15,6 +15,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tionix.rms.feature.search.domain.model.SearchResult
 import com.tionix.rms.feature.search.domain.repository.SearchType
+import com.tionix.rms.ui.common.EmptyState
+import com.tionix.rms.ui.common.LoadingState
+import com.tionix.rms.ui.common.NotFoundState
+import com.tionix.rms.ui.common.OfflineState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,6 +30,17 @@ fun SearchScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchType by viewModel.searchType.collectAsStateWithLifecycle()
+    val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
+
+    LaunchedEffect(Unit) {
+        viewModel.startScanner()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.stopScanner()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -61,15 +76,15 @@ fun SearchScreen(
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         trailingIcon = {
-                            IconButton(onClick = { viewModel.search() }) {
-                                Icon(Icons.Default.Search, contentDescription = "Search")
+                            IconButton(onClick = { viewModel.searchByBarcode(searchQuery) }) {
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                             }
                         }
                     )
                     
                     var expanded by remember { mutableStateOf(false) }
                     Box {
-                        Button(onClick = { expanded = true }, variant = ButtonDefaults.outlinedButtonVariant) {
+                        OutlinedButton(onClick = { expanded = true }) {
                             Text(searchType.name)
                             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                         }
@@ -79,7 +94,7 @@ fun SearchScreen(
                         ) {
                             SearchType.entries.forEach { type ->
                                 DropdownMenuItem(
-                                    text = type.name,
+                                    text = { Text(type.name) },
                                     onClick = {
                                         viewModel.onSearchTypeChanged(type)
                                         expanded = false
@@ -91,31 +106,17 @@ fun SearchScreen(
                 }
             }
             
+            if (isOffline) {
+                OfflineState()
+            }
+            
             when (val state = uiState) {
                 is SearchUiState.Loading -> {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator()
-                    }
+                    LoadingState()
                 }
                 is SearchUiState.Success -> {
                     if (state.results.isEmpty()) {
-                        Card(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Box(
-                                modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "No results found",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
+                        NotFoundState()
                     } else {
                         LazyColumn(
                             modifier = Modifier.fillMaxWidth(),
@@ -129,6 +130,9 @@ fun SearchScreen(
                             }
                         }
                     }
+                }
+                is SearchUiState.NotFound -> {
+                    NotFoundState()
                 }
                 is SearchUiState.Error -> {
                     Card(
@@ -149,36 +153,13 @@ fun SearchScreen(
                     }
                 }
                 SearchUiState.Idle -> {
-                    Card(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxWidth().padding(32.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Search,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(48.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "Enter a search query",
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    text = "Search for boxes or file records by barcode, name, or title",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
+                    EmptyState(
+                        message = "Enter a search query or scan a barcode",
+                        modifier = Modifier
+                    )
+                }
+                SearchUiState.BoxDetailLoaded -> {
+                    // Should not happen in SearchScreen, handled in BoxDetailScreen
                 }
             }
         }

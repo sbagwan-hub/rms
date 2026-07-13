@@ -4,76 +4,44 @@ import android.content.Context
 import com.tionix.rms.core.scanner.domain.model.ScanResult
 import com.tionix.rms.core.scanner.domain.model.ScanType
 import com.tionix.rms.core.scanner.domain.repository.ScannerRepository
+import com.tionix.rms.utils.scanner.ScannerManager
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class ScannerRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val scannerManager: ScannerManager
 ) : ScannerRepository {
 
-    private var isScanning = false
-    private val _scanResults = callbackFlow<ScanResult> {
-        awaitClose()
-    }
-
-    override val scanResults: Flow<ScanResult>
-        get() = _scanResults
-
-    override suspend fun initializeScanner(): Result<Unit> {
-        return try {
-            // In production, this would initialize the Honeywell SDK
-            // For now, simulate successful initialization
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun startScanning(): Result<Unit> {
-        return try {
-            isScanning = true
-            // In production, this would start the Honeywell scanner
-            // For now, simulate scanning
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun stopScanning(): Result<Unit> {
-        return try {
-            isScanning = false
-            // In production, this would stop the Honeywell scanner
-            Result.success(Unit)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    override suspend fun isScannerAvailable(): Result<Boolean> {
-        return try {
-            // In production, this would check if the Honeywell scanner is available
-            // For now, return true for demonstration
-            Result.success(true)
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
-    }
-
-    // Simulated scan method for testing - would be called by Honeywell SDK in production
-    fun simulateScan(barcode: String, type: ScanType = ScanType.BARCODE) {
-        val result = ScanResult(
+    override val scanResults: Flow<ScanResult> = scannerManager.scanResults.map { barcode ->
+        ScanResult(
             barcode = barcode,
-            scanType = type,
+            scanType = ScanType.BARCODE,
             timestamp = System.currentTimeMillis(),
             rawData = barcode
         )
-        // In production, this would be emitted by the SDK callback
+    }
+
+    override suspend fun initializeScanner(): Result<Unit> {
+        scannerManager.enable()
+        return Result.success(Unit)
+    }
+
+    override suspend fun startScanning(): Result<Unit> {
+        scannerManager.startScanTrigger()
+        return Result.success(Unit)
+    }
+
+    override suspend fun stopScanning(): Result<Unit> {
+        scannerManager.stopScanTrigger()
+        return Result.success(Unit)
+    }
+
+    override suspend fun isScannerAvailable(): Result<Boolean> {
+        return Result.success(true)
     }
 }

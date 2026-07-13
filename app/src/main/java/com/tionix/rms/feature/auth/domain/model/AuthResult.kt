@@ -8,8 +8,7 @@ sealed class AuthResult {
 
 data class User(
     val id: String,
-    val username: String,
+    val fullName: String,
     val email: String,
-    val companyId: String,
-    val deviceId: String
+    val role: UserRole
 )

@@ -10,15 +10,25 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val LightColorScheme = lightColorScheme(
-    primary = PrimaryBlue,
-    onPrimary = Surface,
-    primaryContainer = DarkBlue,
-    background = Background,
-    onBackground = PrimaryText,
-    surface = Surface,
-    onSurface = PrimaryText,
-    error = Error,
-    onError = Surface
+    primary = BluePrimary,
+    onPrimary = SurfaceWhite,
+    primaryContainer = BluePrimary.copy(alpha = 0.1f),
+    onPrimaryContainer = BluePrimary,
+    secondary = InfoBlue,
+    onSecondary = SurfaceWhite,
+    secondaryContainer = BorderSlate200,
+    onSecondaryContainer = TextSlate900,
+    tertiary = InfoBlue,
+    onTertiary = SurfaceWhite,
+    background = BackgroundSlate,
+    onBackground = TextSlate900,
+    surface = SurfaceWhite,
+    onSurface = TextSlate900,
+    surfaceVariant = BackgroundSlate,
+    onSurfaceVariant = TextSlate600,
+    outline = BorderSlate200,
+    error = ErrorRose,
+    onError = SurfaceWhite
 )
 
 @Composable
@@ -30,14 +40,15 @@ fun RMSTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.primary.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = false
+            window.statusBarColor = colorScheme.background.toArgb()
+            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = true
         }
     }
 
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
+        shapes = Shapes,
         content = content
     )
 }

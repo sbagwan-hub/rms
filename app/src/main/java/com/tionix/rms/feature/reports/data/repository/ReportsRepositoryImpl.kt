@@ -1,6 +1,7 @@
 package com.tionix.rms.feature.reports.data.repository
 
 import com.tionix.rms.feature.reports.data.remote.ReportsApiService
+import com.tionix.rms.feature.reports.data.remote.dto.toDomain
 import com.tionix.rms.feature.reports.domain.model.ActivityHistory
 import com.tionix.rms.feature.reports.domain.model.Report
 import com.tionix.rms.feature.reports.domain.model.ReportType

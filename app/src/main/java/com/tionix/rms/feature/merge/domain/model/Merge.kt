@@ -16,6 +16,33 @@ data class Merge(
     val createdAt: String
 )
 
+data class MergeSession(
+    val id: String,
+    val sessionId: String,
+    val destinationBox: Box,
+    val sourceBoxes: List<Box>,
+    val status: SessionStatus,
+    val startTime: String,
+    val endTime: String?,
+    val capacityWarning: String?
+)
+
+data class Box(
+    val id: String,
+    val barcode: String,
+    val description: String,
+    val location: String,
+    val fileCount: Int,
+    val capacity: Int?
+)
+
+enum class SessionStatus {
+    SCANNING_DESTINATION,
+    SCANNING_SOURCES,
+    CONFIRMING,
+    COMPLETED
+}
+
 enum class MergeStatus {
     PENDING,
     IN_PROGRESS,

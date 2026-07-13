@@ -9,4 +9,7 @@ sealed class SegregationUiState {
     data class BoxScanned(val segregation: Segregation?) : SegregationUiState()
     object SegregationStarted : SegregationUiState()
     object SegregationCompleted : SegregationUiState()
+    object SessionStarted : SegregationUiState()
+    data class ValidationError(val message: String) : SegregationUiState()
+    data class FileMoved(val fileBarcode: String) : SegregationUiState()
 }

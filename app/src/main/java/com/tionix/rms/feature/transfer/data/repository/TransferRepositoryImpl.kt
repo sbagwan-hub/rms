@@ -1,6 +1,8 @@
 package com.tionix.rms.feature.transfer.data.repository
 
 import com.tionix.rms.feature.transfer.data.remote.TransferApiService
+import com.tionix.rms.feature.transfer.data.remote.dto.toDomain
+import com.tionix.rms.feature.transfer.data.remote.dto.toDto
 import com.tionix.rms.feature.transfer.domain.model.StartTransferRequest
 import com.tionix.rms.feature.transfer.domain.model.Transfer
 import com.tionix.rms.feature.transfer.domain.repository.TransferRepository
@@ -60,5 +62,37 @@ class TransferRepositoryImpl @Inject constructor(
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    // Session management is handled locally in the domain/use-case layer.
+    // These methods satisfy the interface contract; backend sync happens via syncTransferToQueue.
+
+    override suspend fun startTransferSession(
+        transferType: com.tionix.rms.feature.transfer.domain.model.TransferType
+    ): Result<com.tionix.rms.feature.transfer.domain.model.TransferSession> {
+        return Result.failure(UnsupportedOperationException("Session management is local"))
+    }
+
+    override suspend fun addTransferItem(
+        sessionId: String,
+        barcode: String
+    ): Result<com.tionix.rms.feature.transfer.domain.model.TransferItem> {
+        return Result.failure(UnsupportedOperationException("Session management is local"))
+    }
+
+    override suspend fun removeTransferItem(sessionId: String, itemId: String): Result<Unit> {
+        return Result.failure(UnsupportedOperationException("Session management is local"))
+    }
+
+    override suspend fun setDestination(sessionId: String, destination: String): Result<Unit> {
+        return Result.failure(UnsupportedOperationException("Session management is local"))
+    }
+
+    override suspend fun submitTransfer(sessionId: String): Result<Unit> {
+        return Result.failure(UnsupportedOperationException("Use completeTransfer with transferId"))
+    }
+
+    override suspend fun syncTransferToQueue(transferId: String): Result<Unit> {
+        return Result.failure(UnsupportedOperationException("Not yet implemented"))
     }
 }

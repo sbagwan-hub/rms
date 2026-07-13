@@ -7,4 +7,6 @@ sealed class SearchUiState {
     object Loading : SearchUiState()
     data class Success(val results: List<SearchResult>) : SearchUiState()
     data class Error(val message: String) : SearchUiState()
+    object NotFound : SearchUiState()
+    object BoxDetailLoaded : SearchUiState()
 }
