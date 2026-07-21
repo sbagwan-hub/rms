@@ -1,6 +1,7 @@
 package com.tionix.rms
 
 import android.app.Application
+import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import androidx.work.Constraints
@@ -30,11 +31,17 @@ class RmsApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        Log.d("RmsApplication", "onCreate: workerFactory initialized = ${::workerFactory.isInitialized}")
         // Manual init required now that the manifest's auto-initializer is
         // disabled (see AndroidManifest.xml) — this guarantees the
         // Hilt-aware factory is installed before anything can call
         // WorkManager.getInstance().
-        WorkManager.initialize(this, workManagerConfiguration)
+        try {
+            WorkManager.initialize(this, workManagerConfiguration)
+            Log.d("RmsApplication", "WorkManager.initialize() succeeded with custom factory")
+        } catch (e: Exception) {
+            Log.e("RmsApplication", "WorkManager.initialize() failed", e)
+        }
         schedulePeriodicSync()
     }
 
