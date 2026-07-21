@@ -42,5 +42,26 @@
         <meta-data
             android:name="com.google.mlkit.vision.DEPENDENCIES"
             android:value="barcode_ui" />
+
+        <!--
+            Disable WorkManager's automatic androidx-startup initializer.
+            On this build, its Configuration.Provider auto-detection was not
+            picking up RmsApplication's Hilt-aware config — WorkManager kept
+            falling back to the default reflection WorkerFactory, which
+            cannot construct @HiltWorker classes (SyncWorker), so every
+            enqueued sync run failed with NoSuchMethodException before ever
+            reaching the network. WorkManager is initialized manually in
+            RmsApplication.onCreate() instead.
+        -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
+        </provider>
     </application>
 </manifest>
