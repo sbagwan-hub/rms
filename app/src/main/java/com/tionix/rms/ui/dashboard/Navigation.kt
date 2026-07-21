@@ -1,15 +1,19 @@
 package com.tionix.rms.ui.dashboard
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
@@ -23,10 +27,9 @@ data class BottomNavItem(
     val route: String
 )
 
+/** Only Home + Profile — Scanner FAB lives in the centre slot */
 val bottomNavItems = listOf(
     BottomNavItem("Home", Icons.Default.Home, RmsRoutes.HOME),
-    BottomNavItem("Search", Icons.Default.Search, RmsRoutes.SEARCH),
-    BottomNavItem("Reports", Icons.Default.Assessment, RmsRoutes.REPORTS),
     BottomNavItem("Profile", Icons.Default.Person, RmsRoutes.PROFILE)
 )
 
@@ -56,6 +59,34 @@ fun RmsTopAppBar(
     )
 }
 
+/**
+ * Scanner FAB that floats above the centre of the bottom nav bar.
+ * Elevated, circular, with a gradient-tinted background.
+ */
+@Composable
+fun ScannerFab(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    FloatingActionButton(
+        onClick = onClick,
+        shape = CircleShape,
+        containerColor = MaterialTheme.colorScheme.primary,
+        contentColor = MaterialTheme.colorScheme.onPrimary,
+        elevation = FloatingActionButtonDefaults.elevation(
+            defaultElevation = 6.dp,
+            pressedElevation = 2.dp
+        ),
+        modifier = modifier.size(60.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.QrCodeScanner,
+            contentDescription = "Scanner",
+            modifier = Modifier.size(30.dp)
+        )
+    }
+}
+
 @Composable
 fun RmsBottomNavigation(
     currentRoute: String,
@@ -63,31 +94,58 @@ fun RmsBottomNavigation(
 ) {
     NavigationBar(
         containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        tonalElevation = 0.dp
     ) {
-        bottomNavItems.forEach { item ->
-            NavigationBarItem(
-                selected = currentRoute == item.route,
-                onClick = { onItemSelected(item.route) },
-                icon = {
-                    Icon(
-                        imageVector = item.icon,
-                        contentDescription = item.label
-                    )
-                },
-                label = {
-                    Text(text = item.label, style = MaterialTheme.typography.labelSmall)
-                },
-                modifier = Modifier.defaultMinSize(minHeight = Dimens.touchTargetMin),
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = MaterialTheme.colorScheme.primary,
-                    unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    selectedTextColor = MaterialTheme.colorScheme.primary,
-                    unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                )
+        // Left side — Home
+        val homeItem = bottomNavItems[0]
+        NavigationBarItem(
+            selected = currentRoute == homeItem.route,
+            onClick = { onItemSelected(homeItem.route) },
+            icon = {
+                Icon(imageVector = homeItem.icon, contentDescription = homeItem.label)
+            },
+            label = {
+                Text(text = homeItem.label, style = MaterialTheme.typography.labelSmall)
+            },
+            modifier = Modifier.defaultMinSize(minHeight = Dimens.touchTargetMin),
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
             )
-        }
+        )
+
+        // Centre slot — empty space for the FAB cutout
+        NavigationBarItem(
+            selected = false,
+            onClick = {},
+            enabled = false,
+            icon = { Box(modifier = Modifier.size(60.dp)) }, // invisible spacer
+            label = { Text("") },
+            modifier = Modifier.defaultMinSize(minHeight = Dimens.touchTargetMin)
+        )
+
+        // Right side — Profile
+        val profileItem = bottomNavItems[1]
+        NavigationBarItem(
+            selected = currentRoute == profileItem.route,
+            onClick = { onItemSelected(profileItem.route) },
+            icon = {
+                Icon(imageVector = profileItem.icon, contentDescription = profileItem.label)
+            },
+            label = {
+                Text(text = profileItem.label, style = MaterialTheme.typography.labelSmall)
+            },
+            modifier = Modifier.defaultMinSize(minHeight = Dimens.touchTargetMin),
+            colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = MaterialTheme.colorScheme.primary,
+                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                selectedTextColor = MaterialTheme.colorScheme.primary,
+                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            )
+        )
     }
 }

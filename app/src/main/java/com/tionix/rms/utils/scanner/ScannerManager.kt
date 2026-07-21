@@ -40,4 +40,9 @@ interface ScannerManager {
      * @param enabled True to scan continuously without resetting trigger.
      */
     fun setContinuousMode(enabled: Boolean)
+
+    /**
+     * Start camera-based QR/barcode scanning using Google Play Services Code Scanner.
+     */
+    fun startCameraScan(context: android.content.Context, onScanResult: ((String) -> Unit)? = null)
 }

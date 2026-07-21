@@ -86,6 +86,162 @@ fun DashboardScreen(
                     
                     item {
                         Text(
+                            text = "Barcode Scan Workflows",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    
+                    item {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                WorkflowCard(
+                                    title = "Fresh Box Move",
+                                    icon = Icons.Default.MoveToInbox,
+                                    description = "Scan fresh box to location",
+                                    onClick = {
+                                        onTaskClick(
+                                            Task(
+                                                id = "",
+                                                type = TaskType.FRESH_BOX_MOVE,
+                                                title = "",
+                                                description = "",
+                                                status = TaskStatus.PENDING,
+                                                priority = TaskPriority.MEDIUM,
+                                                assignedTo = "",
+                                                createdAt = "",
+                                                dueDate = null
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                WorkflowCard(
+                                    title = "Refile",
+                                    icon = Icons.Default.Upload,
+                                    description = "Scan files back to box",
+                                    onClick = {
+                                        onTaskClick(
+                                            Task(
+                                                id = "",
+                                                type = TaskType.REFILE,
+                                                title = "",
+                                                description = "",
+                                                status = TaskStatus.PENDING,
+                                                priority = TaskPriority.MEDIUM,
+                                                assignedTo = "",
+                                                createdAt = "",
+                                                dueDate = null
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                WorkflowCard(
+                                    title = "Segregation",
+                                    icon = Icons.Default.CallSplit,
+                                    description = "Move files out of box",
+                                    onClick = {
+                                        onTaskClick(
+                                            Task(
+                                                id = "",
+                                                type = TaskType.SEGREGATION,
+                                                title = "",
+                                                description = "",
+                                                status = TaskStatus.PENDING,
+                                                priority = TaskPriority.MEDIUM,
+                                                assignedTo = "",
+                                                createdAt = "",
+                                                dueDate = null
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                WorkflowCard(
+                                    title = "Merge",
+                                    icon = Icons.Default.CallMerge,
+                                    description = "Combine boxes together",
+                                    onClick = {
+                                        onTaskClick(
+                                            Task(
+                                                id = "",
+                                                type = TaskType.MERGE,
+                                                title = "",
+                                                description = "",
+                                                status = TaskStatus.PENDING,
+                                                priority = TaskPriority.MEDIUM,
+                                                assignedTo = "",
+                                                createdAt = "",
+                                                dueDate = null
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                WorkflowCard(
+                                    title = "Transfer",
+                                    icon = Icons.Default.LocalShipping,
+                                    description = "Transfer items/boxes",
+                                    onClick = {
+                                        onTaskClick(
+                                            Task(
+                                                id = "",
+                                                type = TaskType.TRANSFER,
+                                                title = "",
+                                                description = "",
+                                                status = TaskStatus.PENDING,
+                                                priority = TaskPriority.MEDIUM,
+                                                assignedTo = "",
+                                                createdAt = "",
+                                                dueDate = null
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                WorkflowCard(
+                                    title = "Verification",
+                                    icon = Icons.Default.FactCheck,
+                                    description = "Inventory verification scan",
+                                    onClick = {
+                                        onTaskClick(
+                                            Task(
+                                                id = "",
+                                                type = TaskType.INVENTORY_VERIFICATION,
+                                                title = "",
+                                                description = "",
+                                                status = TaskStatus.PENDING,
+                                                priority = TaskPriority.MEDIUM,
+                                                assignedTo = "",
+                                                createdAt = "",
+                                                dueDate = null
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                    
+                    item {
+                        Text(
                             text = "Assigned Tasks",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
@@ -421,5 +577,63 @@ private fun PriorityBadge(priority: TaskPriority) {
             color = color,
             fontWeight = FontWeight.Medium
         )
+    }
+}
+
+@Composable
+private fun WorkflowCard(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.height(112.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = title,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Column {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    lineHeight = androidx.compose.ui.unit.TextUnit.Unspecified
+                )
+            }
+        }
     }
 }

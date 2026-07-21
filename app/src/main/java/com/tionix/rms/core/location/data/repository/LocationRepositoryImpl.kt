@@ -8,6 +8,7 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import androidx.core.content.ContextCompat
+import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.core.location.domain.model.LocationData
 import com.tionix.rms.core.location.domain.model.LocationTrackingState
 import com.tionix.rms.core.location.domain.repository.LocationRepository
@@ -80,7 +81,7 @@ class LocationRepositoryImpl @Inject constructor(
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -90,7 +91,7 @@ class LocationRepositoryImpl @Inject constructor(
             // In production, would remove location updates here
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -124,7 +125,7 @@ class LocationRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Unable to get current location"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 

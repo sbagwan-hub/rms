@@ -36,7 +36,23 @@ fun RefileScreen(
     val showMismatchDialog by viewModel.showMismatchDialog.collectAsStateWithLifecycle()
     val showSessionSummary by viewModel.showSessionSummary.collectAsStateWithLifecycle()
     val batchMode by viewModel.batchMode.collectAsStateWithLifecycle()
-    // Local val captures so smart casts work on delegated properties
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> viewModel.scannerRepository.enableScanner()
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> viewModel.scannerRepository.disableScanner()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.scannerRepository.disableScanner()
+        }
+    }
+
     val session = currentSession
     val file = currentFile
 
@@ -109,7 +125,12 @@ fun RefileScreen(
                             label = { Text("File Barcode") },
                             modifier = Modifier.fillMaxWidth(),
                             trailingIcon = {
-                                IconButton(onClick = { viewModel.scanFile() }) {
+                                IconButton(onClick = {
+                                    viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                        viewModel.onScannedBarcodeChanged(barcode)
+                                        viewModel.scanFile()
+                                    }
+                                }) {
                                     Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                                 }
                             }
@@ -155,8 +176,13 @@ fun RefileScreen(
                                 label = { Text("Destination Box Barcode") },
                                 modifier = Modifier.fillMaxWidth(),
                                 trailingIcon = {
-                                    IconButton(onClick = { viewModel.confirmRefile() }) {
-                                        Icon(Icons.Default.Check, contentDescription = "Confirm")
+                                    IconButton(onClick = {
+                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                            viewModel.onDestinationBoxBarcodeChanged(barcode)
+                                            viewModel.confirmRefile()
+                                        }
+                                    }) {
+                                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                                     }
                                 }
                             )

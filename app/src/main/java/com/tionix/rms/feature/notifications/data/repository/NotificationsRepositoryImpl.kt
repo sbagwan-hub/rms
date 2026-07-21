@@ -1,5 +1,6 @@
 package com.tionix.rms.feature.notifications.data.repository
 
+import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.feature.notifications.data.remote.NotificationsApiService
 import com.tionix.rms.feature.notifications.data.remote.dto.toDomain
 import com.tionix.rms.feature.notifications.domain.model.Notification
@@ -19,7 +20,7 @@ class NotificationsRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to fetch notifications"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -32,7 +33,7 @@ class NotificationsRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to mark as read"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -45,7 +46,7 @@ class NotificationsRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to mark all as read"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -58,7 +59,7 @@ class NotificationsRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to delete notification"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 }

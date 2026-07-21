@@ -26,7 +26,7 @@ class FileSearchViewModel @Inject constructor(
     private val searchFilesUseCase: SearchFilesUseCase,
     private val searchFileByBarcodeUseCase: SearchFileByBarcodeUseCase,
     private val getFileDetailUseCase: GetFileDetailUseCase,
-    private val scannerRepository: ScannerRepository,
+    val scannerRepository: ScannerRepository,
     private val initializeScannerUseCase: InitializeScannerUseCase,
     private val startScanningUseCase: StartScanningUseCase,
     private val stopScanningUseCase: StopScanningUseCase

@@ -20,9 +20,10 @@ object RmsRoutes {
     const val TRANSFER = "transfer"
     const val SEGREGATION = "segregation"
     const val MERGE = "merge"
+    const val SCAN = "scan"
 
-    /** Routes that show the bottom navigation bar. */
-    val bottomBarRoutes = setOf(HOME, SEARCH, REPORTS, PROFILE)
+    /** Routes that show the bottom navigation bar + scanner FAB. */
+    val bottomBarRoutes = setOf(HOME, PROFILE, SEARCH, FILE_SEARCH, BOX_DETAIL, FILE_DETAIL, HISTORY, SETTINGS, SYNC_QUEUE, REPORTS, NOTIFICATIONS, FRESH_BOX_MOVE, INVENTORY_VERIFICATION, REFILE, TRANSFER, SEGREGATION, MERGE)
     
     fun boxDetail(boxId: String) = "box_detail/$boxId"
     fun fileDetail(fileId: String) = "file_detail/$fileId"

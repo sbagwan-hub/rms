@@ -1,5 +1,6 @@
 package com.tionix.rms.feature.segregation.data.repository
 
+import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.feature.segregation.data.remote.SegregationApiService
 import com.tionix.rms.feature.segregation.data.remote.dto.toDomain
 import com.tionix.rms.feature.segregation.data.remote.dto.toDto
@@ -24,7 +25,7 @@ class SegregationRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to fetch segregations"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -37,7 +38,7 @@ class SegregationRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to start segregation"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -50,7 +51,7 @@ class SegregationRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to complete segregation"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -63,7 +64,7 @@ class SegregationRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to scan box"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 

@@ -4,23 +4,23 @@ import com.tionix.rms.feature.inventory.domain.model.InventoryVerification
 import com.tionix.rms.feature.inventory.domain.model.StartVerificationRequest
 import com.tionix.rms.feature.inventory.domain.model.VerificationStatus
 
-fun StartVerificationRequest.toDto(): StartVerificationRequestDto {
-    return StartVerificationRequestDto(locationId = locationId)
+fun StartVerificationRequest.toDto(boxId: String): StartVerificationRequestDto {
+    return StartVerificationRequestDto(boxId = boxId)
 }
 
 fun InventoryVerificationDto.toDomain(): InventoryVerification {
     return InventoryVerification(
         id = id,
-        verificationCode = verificationCode,
-        locationId = locationId,
-        locationName = locationName,
-        status = VerificationStatus.valueOf(status),
-        totalBoxes = totalBoxes,
-        verifiedBoxes = verifiedBoxes,
-        discrepancyBoxes = discrepancyBoxes,
-        assignedTo = assignedTo,
+        verificationCode = "INV-${id.take(8).uppercase()}",
+        locationId = boxId,
+        locationName = box.barcode,
+        status = if (endedAt != null) VerificationStatus.COMPLETED else VerificationStatus.IN_PROGRESS,
+        totalBoxes = scans?.size ?: 0,
+        verifiedBoxes = scans?.count { it.isExpected } ?: 0,
+        discrepancyBoxes = unexpectedFileCount,
+        assignedTo = operator.fullName,
         startedAt = startedAt,
-        completedAt = completedAt,
-        createdAt = createdAt
+        completedAt = endedAt,
+        createdAt = startedAt
     )
 }

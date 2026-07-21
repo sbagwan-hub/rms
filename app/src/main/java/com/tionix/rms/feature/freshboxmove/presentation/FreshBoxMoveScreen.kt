@@ -30,7 +30,6 @@ import com.tionix.rms.ui.components.SecondaryButton
 import com.tionix.rms.ui.theme.Dimens
 import com.tionix.rms.utils.scanner.ScannerManager
 import dagger.hilt.android.EntryPointAccessors
-import javax.inject.Inject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,29 +47,12 @@ fun FreshBoxMoveScreen(
     val context = LocalContext.current
     var showClearConfirm by remember { mutableStateOf(false) }
 
-    // Retrieve ScannerManager from EntryPoint or Hilt directly since we cannot modify constructor
+    // Retrieve ScannerManager via Hilt EntryPoint (ScannerManager is bound in SingletonComponent)
     val scannerManager = remember {
-        // Hilt ViewModel retrieves the binding, but we can also bind it
-        // and inject it. Let's find it.
-        // We will retrieve the ScannerManager directly from our activity's Hilt entry point if needed,
-        // or just let ViewModel manage it and pass it to ScannerEffect!
-        // Wait, does ViewModel expose scannerManager? No, but we can expose it,
-        // or obtain it in the Composable using Hilt entrypoint.
-        // Let's add a getter for scannerManager in ViewModel or get it via Hilt EntryPoint!
-        // To be simple and robust: let's modify ViewModel to expose `val scannerManager`!
-        // Yes, we will view ViewModel and make sure it is accessible or exposes handles!
-        // Let's see: in ViewModel we injected ScannerManager, but we made it private.
-        // We can modify ViewModel's definition to make it public: `val scannerManager: ScannerManager`.
-        // Let's look at ViewModel's code. Yes, in my ViewModel code I wrote:
-        // `private val scannerManager: ScannerManager` (wait, I wrote `private val scannerManager: ScannerManager`).
-        // Ah, let's look at the parameters: `private val scannerManager: ScannerManager` on line 21.
-        // If we make it public or expose a public getter, we can access it!
-        // Wait! We can retrieve ScannerManager from EntryPoint:
-        val entryPoint = EntryPointAccessors.fromApplication(
+        EntryPointAccessors.fromApplication(
             context.applicationContext,
             FreshBoxScreenEntryPoint::class.java
-        )
-        entryPoint.scannerManager()
+        ).scannerManager()
     }
 
     // Collect scanned barcodes from hardware imager
@@ -200,11 +182,26 @@ fun FreshBoxMoveScreen(
                                 }
 
                                 if (locationBarcode.isBlank()) {
-                                    Text(
-                                        text = "Scan a location barcode to start...",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.error,
-                                        fontWeight = FontWeight.Medium
+                                    OutlinedTextField(
+                                        value = locationBarcode,
+                                        onValueChange = { viewModel.handleBarcodeScan(it) },
+                                        label = { Text("Scan or Enter Location Barcode") },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        trailingIcon = {
+                                            IconButton(
+                                                onClick = {
+                                                    scannerManager.startCameraScan(context) { barcode ->
+                                                        viewModel.handleBarcodeScan(barcode)
+                                                    }
+                                                }
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.QrCodeScanner,
+                                                    contentDescription = "Scan Location",
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
+                                        }
                                     )
                                 } else {
                                     Row(
@@ -253,6 +250,19 @@ fun FreshBoxMoveScreen(
                                     value = boxBarcode,
                                     onValueChange = viewModel::onBoxBarcodeChanged,
                                     label = "Scan Box Barcode",
+                                    trailingIcon = {
+                                        IconButton(onClick = {
+                                            scannerManager.startCameraScan(context) { barcode ->
+                                                viewModel.onBoxBarcodeChanged(barcode)
+                                                viewModel.submitScan(barcode)
+                                            }
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Default.QrCodeScanner,
+                                                contentDescription = "Scan Box"
+                                            )
+                                        }
+                                    },
                                     modifier = Modifier
                                         .weight(1f)
                                         .heightIn(min = 56.dp)
@@ -266,6 +276,7 @@ fun FreshBoxMoveScreen(
                                             shape = RoundedCornerShape(12.dp)
                                         )
                                 ) {
+                                    @Suppress("DEPRECATION")
                                     Icon(
                                         Icons.Default.Send,
                                         contentDescription = "Submit",

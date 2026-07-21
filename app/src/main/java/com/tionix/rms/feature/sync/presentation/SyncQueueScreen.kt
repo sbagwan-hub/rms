@@ -38,6 +38,7 @@ fun SyncQueueScreen(
                 title = { Text("Sync Queue") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
+                        @Suppress("DEPRECATION")
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },

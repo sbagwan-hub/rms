@@ -113,7 +113,7 @@ fun ProfileScreen(
                                     }
                                 }
                                 
-                                Divider()
+                                HorizontalDivider()
                                 
                                 profile?.let { user ->
                                     ProfileItem("Warehouse", user.warehouseName)
@@ -223,6 +223,7 @@ fun ProfileScreen(
                                 containerColor = MaterialTheme.colorScheme.error
                             )
                         ) {
+                            @Suppress("DEPRECATION")
                             Icon(Icons.Default.Logout, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Logout")

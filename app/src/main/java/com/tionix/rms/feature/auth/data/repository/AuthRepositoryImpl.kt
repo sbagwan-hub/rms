@@ -2,6 +2,7 @@ package com.tionix.rms.feature.auth.data.repository
 
 import android.content.Context
 import androidx.biometric.BiometricManager
+import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.feature.auth.data.local.AuthPreferences
 import com.tionix.rms.feature.auth.data.remote.AuthApiService
 import com.tionix.rms.feature.auth.data.remote.dto.toDomain
@@ -41,10 +42,25 @@ class AuthRepositoryImpl @Inject constructor(
                     user = loginResponse.user.toDomain()
                 )
             } else {
-                AuthResult.Error("Login failed: ${response.message()}", response.code().toString())
+                val errorMsg = try {
+                    val errorBodyStr = response.errorBody()?.string()
+                    if (!errorBodyStr.isNullOrBlank()) {
+                        val jsonObject = com.google.gson.JsonParser.parseString(errorBodyStr).asJsonObject
+                        if (jsonObject.has("error")) {
+                            jsonObject.getAsJsonObject("error").get("message").asString
+                        } else {
+                            "Login failed: ${response.message()}"
+                        }
+                    } else {
+                        "Login failed: ${response.message()}"
+                    }
+                } catch (e: Exception) {
+                    "Login failed: ${response.message()}"
+                }
+                AuthResult.Error(errorMsg, response.code().toString())
             }
         } catch (e: Exception) {
-            AuthResult.Error("Network error: ${e.message}")
+            AuthResult.Error(ErrorUtils.getFriendlyErrorMessage(e))
         }
     }
 
@@ -78,7 +94,7 @@ class AuthRepositoryImpl @Inject constructor(
                 AuthResult.Error("Biometric login not available")
             }
         } catch (e: Exception) {
-            AuthResult.Error("Biometric login error: ${e.message}")
+            AuthResult.Error(ErrorUtils.getFriendlyErrorMessage(e))
         }
     }
 
@@ -87,7 +103,7 @@ class AuthRepositoryImpl @Inject constructor(
             preferences.clear()
             AuthResult.Success("", "", User("", "", "", UserRole.OPERATOR))
         } catch (e: Exception) {
-            AuthResult.Error("Logout failed: ${e.message}")
+            AuthResult.Error(ErrorUtils.getFriendlyErrorMessage(e))
         }
     }
 
@@ -107,7 +123,7 @@ class AuthRepositoryImpl @Inject constructor(
                 AuthResult.Error("Token refresh failed")
             }
         } catch (e: Exception) {
-            AuthResult.Error("Network error: ${e.message}")
+            AuthResult.Error(ErrorUtils.getFriendlyErrorMessage(e))
         }
     }
 

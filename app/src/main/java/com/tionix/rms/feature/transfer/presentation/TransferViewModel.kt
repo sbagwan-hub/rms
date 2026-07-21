@@ -27,7 +27,7 @@ class TransferViewModel @Inject constructor(
     private val removeTransferItemUseCase: RemoveTransferItemUseCase,
     private val setDestinationUseCase: SetDestinationUseCase,
     private val submitTransferUseCase: SubmitTransferUseCase,
-    private val scannerRepository: ScannerRepository,
+    val scannerRepository: ScannerRepository,
     private val initializeScannerUseCase: InitializeScannerUseCase,
     private val startScanningUseCase: StartScanningUseCase,
     private val stopScanningUseCase: StopScanningUseCase

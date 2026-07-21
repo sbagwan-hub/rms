@@ -18,10 +18,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
+import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
+import com.google.mlkit.vision.barcode.common.Barcode
 
 @Singleton
 class HoneywellScannerManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) : ScannerManager {
 
     private val _scanResults = MutableSharedFlow<String>(extraBufferCapacity = 64)
@@ -143,5 +146,29 @@ class HoneywellScannerManager @Inject constructor(
             putExtra("packageName", context.packageName)
         }
         context.sendBroadcast(intent)
+    }
+
+    override fun startCameraScan(context: Context, onScanResult: ((String) -> Unit)?) {
+        val options = GmsBarcodeScannerOptions.Builder()
+            .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
+            .enableAutoZoom()
+            .build()
+
+        val scanner = GmsBarcodeScanning.getClient(context, options)
+
+        scanner.startScan()
+            .addOnSuccessListener { barcode: com.google.mlkit.vision.barcode.common.Barcode ->
+                val rawValue = barcode.rawValue
+                if (rawValue != null) {
+                    val trimmed = rawValue.trim()
+                    CoroutineScope(Dispatchers.Default).launch {
+                        _scanResults.emit(trimmed)
+                    }
+                    onScanResult?.invoke(trimmed)
+                }
+            }
+            .addOnFailureListener { e ->
+                // Handle/log error if necessary
+            }
     }
 }

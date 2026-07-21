@@ -2,6 +2,7 @@ package com.tionix.rms.feature.segregation.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tionix.rms.core.audio.BeepPlayer
 import com.tionix.rms.core.scanner.domain.repository.ScannerRepository
 import com.tionix.rms.core.scanner.domain.usecase.InitializeScannerUseCase
 import com.tionix.rms.core.scanner.domain.usecase.StartScanningUseCase
@@ -27,10 +28,11 @@ class SegregationViewModel @Inject constructor(
     private val scanTargetBoxUseCase: ScanTargetBoxUseCase,
     private val moveFileUseCase: MoveFileUseCase,
     private val completeSegregationSessionUseCase: CompleteSegregationSessionUseCase,
-    private val scannerRepository: ScannerRepository,
+    val scannerRepository: ScannerRepository,
     private val initializeScannerUseCase: InitializeScannerUseCase,
     private val startScanningUseCase: StartScanningUseCase,
-    private val stopScanningUseCase: StopScanningUseCase
+    private val stopScanningUseCase: StopScanningUseCase,
+    private val beepPlayer: BeepPlayer
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SegregationUiState>(SegregationUiState.Loading)
@@ -125,14 +127,23 @@ class SegregationViewModel @Inject constructor(
                     status = SessionStatus.SCANNING_TARGET
                 )
                 _scannedBarcode.value = ""
+                beepPlayer.positive()
             } else {
                 _uiState.value = SegregationUiState.Error(result.exceptionOrNull()?.message ?: "Failed to scan source box")
+                beepPlayer.error()
             }
         }
     }
 
     fun scanTargetBox(barcode: String) {
         viewModelScope.launch {
+            val sourceBarcode = _sourceBox.value?.barcode
+            if (barcode.trim() == sourceBarcode?.trim()) {
+                _uiState.value = SegregationUiState.ValidationError("Target box cannot be the same as source box")
+                beepPlayer.error()
+                return@launch
+            }
+
             val result = scanTargetBoxUseCase(barcode)
             if (result.isSuccess) {
                 _targetBox.value = result.getOrNull()
@@ -141,8 +152,10 @@ class SegregationViewModel @Inject constructor(
                     status = SessionStatus.MOVING_FILES
                 )
                 _scannedBarcode.value = ""
+                beepPlayer.positive()
             } else {
                 _uiState.value = SegregationUiState.Error(result.exceptionOrNull()?.message ?: "Failed to scan target box")
+                beepPlayer.error()
             }
         }
     }
@@ -152,6 +165,14 @@ class SegregationViewModel @Inject constructor(
             val session = _currentSession.value ?: return@launch
             val sourceBoxBarcode = session.sourceBox.barcode
             
+            // Duplicate Scan Guard
+            val isDuplicate = session.movedFiles.any { it.barcode == fileBarcode }
+            if (isDuplicate) {
+                _uiState.value = SegregationUiState.ValidationError("File already scanned/moved")
+                beepPlayer.error()
+                return@launch
+            }
+
             // Validate file belongs to source box
             val fileInSource = session.sourceFiles.any { it.barcode == fileBarcode }
             if (!fileInSource) {
@@ -159,8 +180,8 @@ class SegregationViewModel @Inject constructor(
                 val invalidFile = session.sourceFiles.firstOrNull { it.barcode == fileBarcode } 
                     ?: FileRecord("", fileBarcode, "Unknown File", sourceBoxBarcode)
                 _validationError.value = invalidFile
-                // TODO: Trigger haptic feedback
                 _uiState.value = SegregationUiState.ValidationError("File does not belong to source box")
+                beepPlayer.error() // Error beep for Out file / mismatch
                 return@launch
             }
             
@@ -173,8 +194,10 @@ class SegregationViewModel @Inject constructor(
                 )
                 _scannedBarcode.value = ""
                 _validationError.value = null
+                beepPlayer.positive() // Positive beep for In file
             } else {
                 _uiState.value = SegregationUiState.Error(result.exceptionOrNull()?.message ?: "Failed to move file")
+                beepPlayer.error()
             }
         }
     }

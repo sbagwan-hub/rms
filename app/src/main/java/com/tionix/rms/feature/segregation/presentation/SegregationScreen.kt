@@ -30,10 +30,27 @@ fun SegregationScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scannedBarcode by viewModel.scannedBarcode.collectAsStateWithLifecycle()
     val currentSession by viewModel.currentSession.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val sourceBox by viewModel.sourceBox.collectAsStateWithLifecycle()
     val targetBox by viewModel.targetBox.collectAsStateWithLifecycle()
     val validationError by viewModel.validationError.collectAsStateWithLifecycle()
     val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> viewModel.scannerRepository.enableScanner()
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> viewModel.scannerRepository.disableScanner()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.scannerRepository.disableScanner()
+        }
+    }
+
     // Local val captures so smart casts work on delegated properties
     val session = currentSession
     val srcBox = sourceBox
@@ -143,7 +160,12 @@ fun SegregationScreen(
                                     label = { Text("Source Box Barcode") },
                                     modifier = Modifier.fillMaxWidth(),
                                     trailingIcon = {
-                                        IconButton(onClick = { viewModel.scanSourceBox(scannedBarcode) }) {
+                                        IconButton(onClick = {
+                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                                viewModel.onScannedBarcodeChanged(barcode)
+                                                viewModel.scanSourceBox(barcode)
+                                            }
+                                        }) {
                                             Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                                         }
                                     }
@@ -190,7 +212,12 @@ fun SegregationScreen(
                                     label = { Text("Target Box Barcode") },
                                     modifier = Modifier.fillMaxWidth(),
                                     trailingIcon = {
-                                        IconButton(onClick = { viewModel.scanTargetBox(scannedBarcode) }) {
+                                        IconButton(onClick = {
+                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                                viewModel.onScannedBarcodeChanged(barcode)
+                                                viewModel.scanTargetBox(barcode)
+                                            }
+                                        }) {
                                             Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                                         }
                                     }
@@ -209,7 +236,7 @@ fun SegregationScreen(
                     }
                     
                     // Show source files
-                    if (session != null && session.sourceFiles.isNotEmpty()) {
+                    if (session?.sourceFiles?.isNotEmpty() == true) {
                         item {
                             Text(
                                 text = "Files in Source Box",
@@ -246,6 +273,7 @@ fun SegregationScreen(
                                         text = "Source: ${sourceBox?.barcode}",
                                         style = MaterialTheme.typography.bodySmall
                                     )
+                                    @Suppress("DEPRECATION")
                                     Icon(Icons.Default.ArrowForward, contentDescription = null)
                                     Text(
                                         text = "Target: ${targetBox?.barcode}",
@@ -259,7 +287,12 @@ fun SegregationScreen(
                                     label = { Text("File Barcode") },
                                     modifier = Modifier.fillMaxWidth(),
                                     trailingIcon = {
-                                        IconButton(onClick = { viewModel.moveFile(scannedBarcode) }) {
+                                        IconButton(onClick = {
+                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                                viewModel.onScannedBarcodeChanged(barcode)
+                                                viewModel.moveFile(barcode)
+                                            }
+                                        }) {
                                             Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                                         }
                                     }
@@ -318,7 +351,7 @@ fun SegregationScreen(
                     }
                     
                     // Remaining files
-                    if (session != null && session.sourceFiles.isNotEmpty()) {
+                    if (session?.sourceFiles?.isNotEmpty() == true) {
                         item {
                             Text(
                                 text = "Remaining Files (${viewModel.getRemainingCount()})",
@@ -333,7 +366,7 @@ fun SegregationScreen(
                     }
                     
                     // Moved files
-                    if (session != null && session.movedFiles.isNotEmpty()) {
+                    if (session?.movedFiles?.isNotEmpty() == true) {
                         item {
                             Text(
                                 text = "Moved Files (${viewModel.getMovedCount()})",
@@ -349,7 +382,7 @@ fun SegregationScreen(
                     }
                     
                     // Complete button when no files remaining
-                    if (session != null && session.sourceFiles.isEmpty() && session.movedFiles.isNotEmpty()) {
+                    if (session?.sourceFiles?.isEmpty() == true && session.movedFiles.isNotEmpty()) {
                         item {
                             Button(
                                 onClick = { viewModel.completeSegregation() },

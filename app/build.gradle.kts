@@ -107,4 +107,15 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
     ksp(libs.hilt.compiler)
+
+    // Google Play Services Code Scanner for camera-based QR / Barcode scanning
+    implementation(libs.play.services.code.scanner)
+
+    // CameraX for camera-based scanner fallback
+    implementation("androidx.camera:camera-camera2:1.3.4")
+    implementation("androidx.camera:camera-lifecycle:1.3.4")
+    implementation("androidx.camera:camera-view:1.3.4")
+    
+    // ML Kit for barcode scanning
+    implementation("com.google.mlkit:barcode-scanning:17.3.0")
 }

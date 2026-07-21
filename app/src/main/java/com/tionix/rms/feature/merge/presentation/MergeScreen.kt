@@ -29,9 +29,26 @@ fun MergeScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scannedBarcode by viewModel.scannedBarcode.collectAsStateWithLifecycle()
     val currentSession by viewModel.currentSession.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val destinationBox by viewModel.destinationBox.collectAsStateWithLifecycle()
     val duplicateError by viewModel.duplicateError.collectAsStateWithLifecycle()
     val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> viewModel.scannerRepository.enableScanner()
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> viewModel.scannerRepository.disableScanner()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.scannerRepository.disableScanner()
+        }
+    }
+
     // Local val captures so smart casts work on delegated properties
     val session = currentSession
     val destBox = destinationBox
@@ -120,7 +137,12 @@ fun MergeScreen(
                                 label = { Text("Destination Box Barcode") },
                                 modifier = Modifier.fillMaxWidth(),
                                 trailingIcon = {
-                                    IconButton(onClick = { viewModel.scanDestinationBox(scannedBarcode) }) {
+                                    IconButton(onClick = {
+                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                            viewModel.onScannedBarcodeChanged(barcode)
+                                            viewModel.scanDestinationBox(barcode)
+                                        }
+                                    }) {
                                         Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                                     }
                                 }
@@ -172,7 +194,12 @@ fun MergeScreen(
                                 label = { Text("Source Box Barcode") },
                                 modifier = Modifier.fillMaxWidth(),
                                 trailingIcon = {
-                                    IconButton(onClick = { viewModel.scanSourceBox(scannedBarcode) }) {
+                                    IconButton(onClick = {
+                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                            viewModel.onScannedBarcodeChanged(barcode)
+                                            viewModel.scanSourceBox(barcode)
+                                        }
+                                    }) {
                                         Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                                     }
                                 }

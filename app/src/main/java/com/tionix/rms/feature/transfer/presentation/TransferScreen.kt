@@ -30,11 +30,28 @@ fun TransferScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val scannedBarcode by viewModel.scannedBarcode.collectAsStateWithLifecycle()
     val currentSession by viewModel.currentSession.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
     val selectedTransferType by viewModel.selectedTransferType.collectAsStateWithLifecycle()
     val destination by viewModel.destination.collectAsStateWithLifecycle()
     val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
     val currentStep by viewModel.currentStep.collectAsStateWithLifecycle()
     val steps by remember { mutableStateOf(viewModel.getSteps()) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> viewModel.scannerRepository.enableScanner()
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> viewModel.scannerRepository.disableScanner()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.scannerRepository.disableScanner()
+        }
+    }
+
     // Capture to local val so smart casts work (delegated properties can't be smart-cast directly)
     val session = currentSession
 
@@ -44,6 +61,7 @@ fun TransferScreen(
                 title = { Text("Transfer") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
+                        @Suppress("DEPRECATION")
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -140,7 +158,12 @@ fun TransferScreen(
                                     label = { Text("Barcode") },
                                     modifier = Modifier.fillMaxWidth(),
                                     trailingIcon = {
-                                        IconButton(onClick = { viewModel.addItem(scannedBarcode) }) {
+                                        IconButton(onClick = {
+                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                                viewModel.onScannedBarcodeChanged(barcode)
+                                                viewModel.addItem(barcode)
+                                            }
+                                        }) {
                                             Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                                         }
                                     }
@@ -182,6 +205,7 @@ fun TransferScreen(
                             modifier = Modifier.fillMaxWidth(),
                             enabled = session.sourceItems.isNotEmpty()
                         ) {
+                            @Suppress("DEPRECATION")
                             Icon(Icons.Default.ArrowForward, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Next: Select Destination")
@@ -209,7 +233,12 @@ fun TransferScreen(
                                     label = { Text("Destination Barcode") },
                                     modifier = Modifier.fillMaxWidth(),
                                     trailingIcon = {
-                                        IconButton(onClick = { viewModel.setDestination(destination) }) {
+                                        IconButton(onClick = {
+                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                                viewModel.onDestinationChanged(barcode)
+                                                viewModel.setDestination(barcode)
+                                            }
+                                        }) {
                                             Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                                         }
                                     }
@@ -447,6 +476,7 @@ private fun TransferTypeOption(
                 )
             }
             
+            @Suppress("DEPRECATION")
             Icon(Icons.Default.ArrowForward, contentDescription = null)
         }
     }
@@ -549,6 +579,7 @@ private fun TransferCard(
                     text = "From: ${transfer.sourceLocation}",
                     style = MaterialTheme.typography.bodySmall
                 )
+                @Suppress("DEPRECATION")
                 Icon(Icons.Default.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Text(
                     text = "To: ${transfer.destinationLocation}",

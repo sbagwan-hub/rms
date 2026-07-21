@@ -130,4 +130,10 @@ abstract class RepositoryModule {
     abstract fun bindFileSearchRepository(
         impl: com.tionix.rms.feature.filesearch.data.repository.FileSearchRepositoryImpl
     ): com.tionix.rms.feature.filesearch.domain.repository.FileSearchRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindScanRepository(
+        impl: com.tionix.rms.data.repository.ScanRepositoryImpl
+    ): com.tionix.rms.data.repository.ScanRepository
 }

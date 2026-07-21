@@ -1,6 +1,7 @@
 package com.tionix.rms.feature.freshboxmove.data.repository
 
 import com.google.gson.Gson
+import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.core.sync.data.local.SyncOperationDao
 import com.tionix.rms.core.sync.data.local.SyncOperationEntity
 import com.tionix.rms.feature.auth.data.local.AuthPreferences
@@ -64,7 +65,7 @@ class FreshBoxMoveRepositoryImpl @Inject constructor(
 
             Result.success(sessionEntity)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -118,7 +119,7 @@ class FreshBoxMoveRepositoryImpl @Inject constructor(
 
             Result.success(scanEntity)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -149,7 +150,7 @@ class FreshBoxMoveRepositoryImpl @Inject constructor(
 
             Result.success(Unit)
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 

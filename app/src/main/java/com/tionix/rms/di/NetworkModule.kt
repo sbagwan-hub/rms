@@ -1,5 +1,6 @@
 package com.tionix.rms.di
 
+import com.tionix.rms.core.network.ApiService
 import com.tionix.rms.feature.auth.data.local.AuthPreferences
 import com.tionix.rms.feature.auth.data.remote.AuthApiService
 import com.tionix.rms.feature.dashboard.data.remote.DashboardApiService
@@ -30,7 +31,7 @@ import javax.inject.Singleton
  * The admin-only surface (`/api/v1/admin/`) is out of scope for this app.
  * 10.0.2.2 is the Android emulator's alias for the host machine's localhost.
  */
-private const val BASE_URL = "http://192.168.1.8:3001/api/v1/mobile/"
+private const val BASE_URL = "http://10.0.2.2:4000/api/v1/mobile/"
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -129,6 +130,11 @@ object NetworkModule {
     @Singleton
     fun provideTransferApiService(retrofit: Retrofit): TransferApiService =
         retrofit.create(TransferApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideApiService(retrofit: Retrofit): ApiService =
+        retrofit.create(ApiService::class.java)
 }
 
 /**

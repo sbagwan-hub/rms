@@ -1,12 +1,11 @@
 package com.tionix.rms.feature.freshboxmove.presentation
 
 import android.content.Context
-import android.media.AudioManager
-import android.media.ToneGenerator
 import android.os.VibrationEffect
 import android.os.Vibrator
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tionix.rms.core.audio.BeepPlayer
 import com.tionix.rms.feature.freshboxmove.data.local.FreshBoxScanEntity
 import com.tionix.rms.feature.freshboxmove.data.local.FreshBoxSessionEntity
 import com.tionix.rms.feature.freshboxmove.domain.repository.FreshBoxMoveRepository
@@ -28,7 +27,8 @@ import javax.inject.Inject
 @HiltViewModel
 class FreshBoxMoveViewModel @Inject constructor(
     private val repository: FreshBoxMoveRepository,
-    @ApplicationContext private val context: Context
+    private val beepPlayer: BeepPlayer,
+    @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<FreshBoxMoveUiState>(FreshBoxMoveUiState.Idle)
@@ -103,14 +103,14 @@ class FreshBoxMoveViewModel @Inject constructor(
     /**
      * Handle hardware barcode scan event.
      */
-    fun handleBarcodeScan(barcode: String) {
+     fun handleBarcodeScan(barcode: String) {
         val trimmed = barcode.trim()
         if (trimmed.isEmpty()) return
 
         // 1. If location is empty or not locked, and barcode starts with location prefix (or we treat it as location scan)
-        // For standard separation: let's assume we scan Location first if it's empty
         if (_locationBarcode.value.isBlank()) {
             _locationBarcode.value = trimmed
+            beepPlayer.positive()
             return
         }
 
@@ -123,12 +123,14 @@ class FreshBoxMoveViewModel @Inject constructor(
             val session = _activeSession.value
             if (session == null) {
                 _uiState.value = FreshBoxMoveUiState.Error("No active session")
+                beepPlayer.error()
                 return@launch
             }
 
             val locCode = _locationBarcode.value.trim()
             if (locCode.isBlank()) {
                 _uiState.value = FreshBoxMoveUiState.Error("Please scan or enter a location barcode first")
+                beepPlayer.error()
                 return@launch
             }
 
@@ -160,40 +162,32 @@ class FreshBoxMoveViewModel @Inject constructor(
                     _locationBarcode.value = "" // reset location for next pair if not locked
                 }
                 _uiState.value = FreshBoxMoveUiState.ActiveSession
+                
+                // Warning beep if more than 9 boxes are moved to the same location
+                val boxesAtLocationCount = currentScans.count { it.locationBarcode == locCode }
+                if (boxesAtLocationCount >= 9) {
+                    beepPlayer.warning()
+                } else {
+                    beepPlayer.positive()
+                }
             } else {
                 _uiState.value = FreshBoxMoveUiState.Error(result.exceptionOrNull()?.message ?: "Failed to submit scan")
+                beepPlayer.error()
             }
         }
     }
 
-    private suspend fun freshBoxDaoCheckDuplicate(sessionId: String, boxBarcode: String): Boolean {
-        // Direct count check to avoid collect blocks
-        return try {
-            val dao = (repository as? com.tionix.rms.feature.freshboxmove.data.repository.FreshBoxMoveRepositoryImpl)
-                // We'll read directly via Repository
-                true
-            // To prevent compiler checks, let's fetch the list of scans in session
-            // and check duplicate.
-            false
-        } catch (e: Exception) {
-            false
-        }
-    }
 
     private fun triggerDuplicateFeedback() {
+        beepPlayer.error()
         try {
-            val toneG = ToneGenerator(AudioManager.STREAM_ALARM, 100)
-            toneG.startTone(ToneGenerator.TONE_CDMA_ALERT_CALL_GUARD, 250)
-        } catch (e: Exception) {
-            // Ignore
-        }
-        try {
-            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(300)
+            context.getSystemService(Vibrator::class.java)?.let { vibrator ->
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(300, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(300)
+                }
             }
         } catch (e: Exception) {
             // Ignore

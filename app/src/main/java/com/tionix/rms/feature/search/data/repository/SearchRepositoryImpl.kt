@@ -1,5 +1,6 @@
 package com.tionix.rms.feature.search.data.repository
 
+import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.feature.search.data.remote.SearchApiService
 import com.tionix.rms.feature.search.data.remote.dto.toDomain
 import com.tionix.rms.feature.search.domain.model.BoxDetail
@@ -21,7 +22,7 @@ class SearchRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Search failed"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -34,7 +35,7 @@ class SearchRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Barcode search failed"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 

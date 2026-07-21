@@ -1,5 +1,6 @@
 package com.tionix.rms.feature.merge.data.repository
 
+import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.feature.merge.data.remote.MergeApiService
 import com.tionix.rms.feature.merge.data.remote.dto.toDomain
 import com.tionix.rms.feature.merge.data.remote.dto.toDto
@@ -23,7 +24,7 @@ class MergeRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to fetch merges"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -36,7 +37,7 @@ class MergeRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to start merge"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -49,7 +50,7 @@ class MergeRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to complete merge"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -62,7 +63,7 @@ class MergeRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to scan box"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 

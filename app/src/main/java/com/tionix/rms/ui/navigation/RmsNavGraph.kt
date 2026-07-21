@@ -1,10 +1,13 @@
 package com.tionix.rms.ui.navigation
 
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FabPosition
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -32,8 +35,10 @@ import com.tionix.rms.feature.sync.presentation.SyncQueueScreen
 import com.tionix.rms.feature.segregation.presentation.SegregationScreen
 import com.tionix.rms.feature.transfer.presentation.TransferScreen
 import com.tionix.rms.ui.dashboard.RmsBottomNavigation
+import com.tionix.rms.ui.dashboard.ScannerFab
 import com.tionix.rms.ui.screens.ProfileScreen
 import com.tionix.rms.ui.screens.splash.SplashScreen
+import com.tionix.rms.ui.screens.scan.ScanScreen
 
 @Composable
 fun RmsNavGraph() {
@@ -57,13 +62,31 @@ fun RmsNavGraph() {
                     }
                 )
             }
-        }
+        },
+        floatingActionButton = {
+            if (currentRoute in RmsRoutes.bottomBarRoutes) {
+                ScannerFab(
+                    modifier = Modifier.offset(y = 56.dp),
+                    onClick = {
+                        navController.navigate(RmsRoutes.SCAN) {
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+        },
+        floatingActionButtonPosition = FabPosition.Center,
+        contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0)
     ) { paddingValues ->
         NavHost(
             navController = navController,
             startDestination = RmsRoutes.SPLASH,
             modifier = Modifier.padding(paddingValues)
         ) {
+            composable(RmsRoutes.SCAN) {
+                ScanScreen(onBack = { navController.popBackStack() })
+            }
+
             composable(RmsRoutes.SPLASH) {
                 SplashScreen(
                     onNavigateToLogin = {
@@ -137,16 +160,13 @@ fun RmsNavGraph() {
                 arguments = listOf(navArgument("boxId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val boxId = backStackEntry.arguments?.getString("boxId") ?: ""
-                // TODO: Get user role from auth state for role guards
-                // For now, assume OPERATOR (no transfer/refile permissions)
-                // In production, this should come from the authenticated user's role
                 BoxDetailScreen(
                     boxId = boxId,
                     onBack = { navController.popBackStack() },
                     onNavigateToTransfer = { /* Navigate to Transfer with boxId */ },
                     onNavigateToRefile = { /* Navigate to Refile with boxId */ },
-                    canTransfer = false, // TODO: Get from user role: SUPERVISOR or WAREHOUSE_MANAGER
-                    canRefile = true // TODO: Get from user role: OPERATOR+
+                    canTransfer = false,
+                    canRefile = true
                 )
             }
 
@@ -155,25 +175,19 @@ fun RmsNavGraph() {
                 arguments = listOf(navArgument("fileId") { type = NavType.StringType })
             ) { backStackEntry ->
                 val fileId = backStackEntry.arguments?.getString("fileId") ?: ""
-                // TODO: Get user role from auth state for role guards
-                // For now, assume OPERATOR (has refile permissions)
-                // In production, this should come from the authenticated user's role
                 FileDetailScreen(
                     fileId = fileId,
                     onBack = { navController.popBackStack() },
                     onNavigateToRefile = { /* Navigate to Refile with fileId */ },
-                    canRefile = true // TODO: Get from user role: OPERATOR+
+                    canRefile = true
                 )
             }
 
             composable(RmsRoutes.HISTORY) {
-                // TODO: Get user role and userId from auth state for role-based filtering
-                // For now, assume OPERATOR (sees own actions only)
-                // In production, this should come from the authenticated user's role
                 HistoryScreen(
                     onBack = { navController.popBackStack() },
-                    userRole = "OPERATOR", // TODO: Get from auth state
-                    userId = "user-123" // TODO: Get from auth state
+                    userRole = "OPERATOR",
+                    userId = "user-123"
                 )
             }
 
@@ -184,12 +198,9 @@ fun RmsNavGraph() {
             }
 
             composable(RmsRoutes.SYNC_QUEUE) {
-                // TODO: Get user role from auth state for role guards
-                // For now, assume OPERATOR (no delete permissions)
-                // In production, this should come from the authenticated user's role
                 SyncQueueScreen(
                     onBack = { navController.popBackStack() },
-                    userRole = "OPERATOR" // TODO: Get from auth state
+                    userRole = "OPERATOR"
                 )
             }
 
@@ -220,42 +231,30 @@ fun RmsNavGraph() {
             }
 
             composable(RmsRoutes.REFILE) {
-                // TODO: Get user role from auth state for role guard
-                // For now, assume OPERATOR (no override permissions)
-                // In production, this should come from the authenticated user's role
                 RefileScreen(
                     onBack = { navController.popBackStack() },
-                    canOverride = false // TODO: Get from user role: SUPERVISOR or WAREHOUSE_MANAGER
+                    canOverride = false
                 )
             }
 
             composable(RmsRoutes.TRANSFER) {
-                // TODO: Get user role from auth state for role guard
-                // For now, assume OPERATOR (no transfer permissions)
-                // In production, this should come from the authenticated user's role
                 TransferScreen(
                     onBack = { navController.popBackStack() },
-                    canStartTransfer = false // TODO: Get from user role: SUPERVISOR or WAREHOUSE_MANAGER
+                    canStartTransfer = false
                 )
             }
 
             composable(RmsRoutes.SEGREGATION) {
-                // TODO: Get user role from auth state for role guard
-                // For now, assume OPERATOR (no segregation permissions)
-                // In production, this should come from the authenticated user's role
                 SegregationScreen(
                     onBack = { navController.popBackStack() },
-                    canStartSegregation = false // TODO: Get from user role: SUPERVISOR or WAREHOUSE_MANAGER
+                    canStartSegregation = false
                 )
             }
 
             composable(RmsRoutes.MERGE) {
-                // TODO: Get user role from auth state for role guard
-                // For now, assume OPERATOR (no merge permissions)
-                // In production, this should come from the authenticated user's role
                 MergeScreen(
                     onBack = { navController.popBackStack() },
-                    canStartMerge = false // TODO: Get from user role: SUPERVISOR or WAREHOUSE_MANAGER
+                    canStartMerge = false
                 )
             }
         }

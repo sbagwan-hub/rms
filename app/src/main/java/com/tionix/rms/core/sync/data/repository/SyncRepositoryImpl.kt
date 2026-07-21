@@ -1,6 +1,7 @@
 package com.tionix.rms.core.sync.data.repository
 
 import android.content.Context
+import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.core.sync.data.local.SyncDatabase
 import com.tionix.rms.core.sync.data.local.SyncOperationEntity
 import com.tionix.rms.core.sync.domain.model.SyncOperation
@@ -38,7 +39,7 @@ class SyncRepositoryImpl @Inject constructor(
                     )
                 )
             } catch (e: Exception) {
-                Result.failure(e)
+                Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
             }
         }
     }
@@ -49,7 +50,7 @@ class SyncRepositoryImpl @Inject constructor(
                 syncDatabase.syncOperationDao().insert(operation.toEntity())
                 Result.success(Unit)
             } catch (e: Exception) {
-                Result.failure(e)
+                Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
             }
         }
     }
@@ -78,7 +79,7 @@ class SyncRepositoryImpl @Inject constructor(
                 
                 Result.success(Unit)
             } catch (e: Exception) {
-                Result.failure(e)
+                Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
             }
         }
     }
@@ -94,7 +95,7 @@ class SyncRepositoryImpl @Inject constructor(
                 
                 processPendingOperations()
             } catch (e: Exception) {
-                Result.failure(e)
+                Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
             }
         }
     }
@@ -105,7 +106,7 @@ class SyncRepositoryImpl @Inject constructor(
                 syncDatabase.syncOperationDao().clearCompleted()
                 Result.success(Unit)
             } catch (e: Exception) {
-                Result.failure(e)
+                Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
             }
         }
     }

@@ -26,7 +26,7 @@ class MergeViewModel @Inject constructor(
     private val scanSourceBoxUseCase: ScanSourceBoxUseCase,
     private val removeSourceBoxUseCase: RemoveSourceBoxUseCase,
     private val submitMergeUseCase: SubmitMergeUseCase,
-    private val scannerRepository: ScannerRepository,
+    val scannerRepository: ScannerRepository,
     private val initializeScannerUseCase: InitializeScannerUseCase,
     private val startScanningUseCase: StartScanningUseCase,
     private val stopScanningUseCase: StopScanningUseCase

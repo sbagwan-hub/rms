@@ -1,5 +1,6 @@
 package com.tionix.rms.feature.reports.data.repository
 
+import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.feature.reports.data.remote.ReportsApiService
 import com.tionix.rms.feature.reports.data.remote.dto.toDomain
 import com.tionix.rms.feature.reports.domain.model.ActivityHistory
@@ -21,7 +22,7 @@ class ReportsRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to fetch reports"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -34,7 +35,7 @@ class ReportsRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to fetch activity history"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -47,7 +48,7 @@ class ReportsRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to download report"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 }

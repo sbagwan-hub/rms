@@ -24,8 +24,6 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
-    var showSyncSnackbar by remember { mutableStateOf(false) }
-    var syncMessage by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -36,6 +34,11 @@ fun SettingsScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
+            )
+        },
+        snackbarHost = {
+            SnackbarHost(
+                hostState = remember { SnackbarHostState() }
             )
         }
     ) { paddingValues ->
@@ -77,7 +80,7 @@ fun SettingsScreen(
                                         onCheckedChange = { viewModel.updateScannerContinuousMode(it) }
                                     )
                                     
-                                    Divider()
+                                    HorizontalDivider()
                                     
                                     SettingToggle(
                                         label = "Scan Beep",
@@ -86,7 +89,7 @@ fun SettingsScreen(
                                         onCheckedChange = { viewModel.updateScannerBeep(it) }
                                     )
                                     
-                                    Divider()
+                                    HorizontalDivider()
                                     
                                     SettingToggle(
                                         label = "Haptic Feedback",
@@ -120,7 +123,7 @@ fun SettingsScreen(
                                         onCheckedChange = { viewModel.updateSyncAutoSync(it) }
                                     )
                                     
-                                    Divider()
+                                    HorizontalDivider()
                                     
                                     SettingToggle(
                                         label = "WiFi Only",
@@ -129,13 +132,11 @@ fun SettingsScreen(
                                         onCheckedChange = { viewModel.updateSyncWifiOnly(it) }
                                     )
                                     
-                                    Divider()
+                                    HorizontalDivider()
                                     
                                     Button(
                                         onClick = {
                                             viewModel.syncNow()
-                                            showSyncSnackbar = true
-                                            syncMessage = "Sync started"
                                         },
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
@@ -217,17 +218,9 @@ fun SettingsScreen(
                     }
                 }
                 SettingsState.SyncCompleted -> {
-                    showSyncSnackbar = true
-                    syncMessage = "Sync completed successfully"
                     viewModel.loadSettings()
                 }
             }
-        }
-    }
-    
-    if (showSyncSnackbar) {
-        LaunchedEffect(syncMessage) {
-            showSyncSnackbar = false
         }
     }
 }

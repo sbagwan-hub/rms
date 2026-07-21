@@ -1,5 +1,6 @@
 package com.tionix.rms.feature.transfer.data.repository
 
+import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.feature.transfer.data.remote.TransferApiService
 import com.tionix.rms.feature.transfer.data.remote.dto.toDomain
 import com.tionix.rms.feature.transfer.data.remote.dto.toDto
@@ -21,7 +22,7 @@ class TransferRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to fetch transfers"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -34,7 +35,7 @@ class TransferRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to start transfer"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -47,7 +48,7 @@ class TransferRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to complete transfer"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -60,7 +61,7 @@ class TransferRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to scan box"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 

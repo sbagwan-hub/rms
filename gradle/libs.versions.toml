@@ -20,9 +20,11 @@ ksp = "2.2.10-2.0.2"
 datastore = "1.1.1"
 work = "2.9.1"
 hiltWork = "1.2.0"
+playServicesCodeScanner = "16.1.0"
 
 
 [libraries]
+play-services-code-scanner = { group = "com.google.android.gms", name = "play-services-code-scanner", version.ref = "playServicesCodeScanner" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

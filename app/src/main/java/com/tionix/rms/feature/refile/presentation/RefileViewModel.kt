@@ -2,6 +2,7 @@ package com.tionix.rms.feature.refile.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tionix.rms.core.audio.BeepPlayer
 import com.tionix.rms.core.scanner.domain.repository.ScannerRepository
 import com.tionix.rms.core.scanner.domain.usecase.InitializeScannerUseCase
 import com.tionix.rms.core.scanner.domain.usecase.StartScanningUseCase
@@ -29,10 +30,11 @@ class RefileViewModel @Inject constructor(
     private val startSessionUseCase: StartSessionUseCase,
     private val endSessionUseCase: EndSessionUseCase,
     private val undoLastActionUseCase: UndoLastActionUseCase,
-    private val scannerRepository: ScannerRepository,
+    val scannerRepository: ScannerRepository,
     private val initializeScannerUseCase: InitializeScannerUseCase,
     private val startScanningUseCase: StartScanningUseCase,
-    private val stopScanningUseCase: StopScanningUseCase
+    private val stopScanningUseCase: StopScanningUseCase,
+    private val beepPlayer: BeepPlayer
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<RefileUiState>(RefileUiState.Loading)
@@ -70,11 +72,20 @@ class RefileViewModel @Inject constructor(
     init {
         loadAssignedRefiles()
         
-        // Collect scanner results for continuous scanning in batch mode
+        // Collect scanner results for continuous scanning in both batch and normal modes
         viewModelScope.launch {
             scannerRepository.scanResults.collect { result ->
                 if (_batchMode.value) {
                     handleScannerResult(result.barcode)
+                } else {
+                    val barcode = result.barcode
+                    if (_currentFile.value == null) {
+                        _scannedBarcode.value = barcode
+                        scanFile()
+                    } else {
+                        _destinationBoxBarcode.value = barcode
+                        confirmRefile()
+                    }
                 }
             }
         }
@@ -163,6 +174,7 @@ class RefileViewModel @Inject constructor(
             if (result.isSuccess) {
                 _currentFile.value = result.getOrNull()
                 _uiState.value = RefileUiState.FileScanned(result.getOrNull())
+                beepPlayer.positive()
                 
                 // In batch mode, move to destination box scanning step
                 if (_batchMode.value) {
@@ -170,6 +182,7 @@ class RefileViewModel @Inject constructor(
                 }
             } else {
                 _uiState.value = RefileUiState.Error(result.exceptionOrNull()?.message ?: "Scan failed")
+                beepPlayer.error()
             }
         }
     }
@@ -181,6 +194,7 @@ class RefileViewModel @Inject constructor(
             
             if (destinationBoxBarcode.isBlank()) {
                 _uiState.value = RefileUiState.Error("Destination box barcode is required")
+                beepPlayer.error()
                 return@launch
             }
 
@@ -188,6 +202,7 @@ class RefileViewModel @Inject constructor(
             if (result.isSuccess) {
                 val action = result.getOrNull()!!
                 _sessionActions.value = _sessionActions.value + action
+                beepPlayer.positive()
                 
                 if (_batchMode.value) {
                     // Clear for next scan in batch mode and reset to file scanning step
@@ -201,6 +216,7 @@ class RefileViewModel @Inject constructor(
             } else {
                 _showMismatchDialog.value = true
                 _uiState.value = RefileUiState.Error(result.exceptionOrNull()?.message ?: "Refile failed")
+                beepPlayer.error()
             }
         }
     }
@@ -213,6 +229,7 @@ class RefileViewModel @Inject constructor(
 
             if (reason.isBlank()) {
                 _uiState.value = RefileUiState.Error("Override reason is required")
+                beepPlayer.error()
                 return@launch
             }
 
@@ -222,6 +239,7 @@ class RefileViewModel @Inject constructor(
                 _sessionActions.value = _sessionActions.value + action
                 _showMismatchDialog.value = false
                 _overrideReason.value = ""
+                beepPlayer.positive()
                 
                 if (_batchMode.value) {
                     // Clear for next scan in batch mode and reset to file scanning step
@@ -234,6 +252,7 @@ class RefileViewModel @Inject constructor(
                 }
             } else {
                 _uiState.value = RefileUiState.Error(result.exceptionOrNull()?.message ?: "Override failed")
+                beepPlayer.error()
             }
         }
     }

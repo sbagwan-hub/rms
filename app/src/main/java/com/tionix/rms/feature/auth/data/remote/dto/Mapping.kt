@@ -9,7 +9,11 @@ fun LoginRequest.toDto(): LoginRequestDto {
     return LoginRequestDto(
         username = username,
         password = password,
-        deviceId = deviceId
+        device = DeviceInfoDto(
+            serialNumber = device.serialNumber,
+            model = device.model,
+            appVersion = device.appVersion
+        )
     )
 }
 

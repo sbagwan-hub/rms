@@ -31,14 +31,21 @@ fun SearchScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val searchType by viewModel.searchType.collectAsStateWithLifecycle()
     val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
-    LaunchedEffect(Unit) {
-        viewModel.startScanner()
-    }
-
-    DisposableEffect(Unit) {
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> viewModel.scannerRepository.enableScanner()
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> viewModel.scannerRepository.disableScanner()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
-            viewModel.stopScanner()
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.scannerRepository.disableScanner()
         }
     }
 
@@ -76,7 +83,12 @@ fun SearchScreen(
                         modifier = Modifier.weight(1f),
                         singleLine = true,
                         trailingIcon = {
-                            IconButton(onClick = { viewModel.searchByBarcode(searchQuery) }) {
+                            IconButton(onClick = {
+                                viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                    viewModel.onSearchQueryChanged(barcode)
+                                    viewModel.searchByBarcode(barcode)
+                                }
+                            }) {
                                 Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                             }
                         }

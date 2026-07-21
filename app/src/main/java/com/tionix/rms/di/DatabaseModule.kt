@@ -38,4 +38,16 @@ object DatabaseModule {
     @Singleton
     fun provideFreshBoxDao(database: com.tionix.rms.feature.freshboxmove.data.local.FreshBoxDatabase): com.tionix.rms.feature.freshboxmove.data.local.FreshBoxDao =
         database.freshBoxDao()
+
+    @Provides
+    @Singleton
+    fun provideInventoryDatabase(@ApplicationContext context: Context): com.tionix.rms.feature.inventory.data.local.InventoryDatabase =
+        Room.databaseBuilder(context, com.tionix.rms.feature.inventory.data.local.InventoryDatabase::class.java, "rms_inventory.db")
+            .fallbackToDestructiveMigration()
+            .build()
+
+    @Provides
+    @Singleton
+    fun provideInventoryDao(database: com.tionix.rms.feature.inventory.data.local.InventoryDatabase): com.tionix.rms.feature.inventory.data.local.InventoryDao =
+        database.inventoryDao()
 }

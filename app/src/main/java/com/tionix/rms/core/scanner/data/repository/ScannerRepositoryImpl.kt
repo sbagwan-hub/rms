@@ -44,4 +44,16 @@ class ScannerRepositoryImpl @Inject constructor(
     override suspend fun isScannerAvailable(): Result<Boolean> {
         return Result.success(true)
     }
+
+    override fun startCameraScan(context: android.content.Context, onScanResult: ((String) -> Unit)?) {
+        scannerManager.startCameraScan(context, onScanResult)
+    }
+
+    override fun enableScanner() {
+        scannerManager.enable()
+    }
+
+    override fun disableScanner() {
+        scannerManager.disable()
+    }
 }

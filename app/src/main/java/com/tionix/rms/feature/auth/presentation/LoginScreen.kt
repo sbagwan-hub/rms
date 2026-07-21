@@ -4,10 +4,14 @@ import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -44,7 +48,12 @@ fun LoginScreen(
     val password by viewModel.password.collectAsStateWithLifecycle()
     val usernameError by viewModel.usernameError.collectAsStateWithLifecycle()
     val passwordError by viewModel.passwordError.collectAsStateWithLifecycle()
+    val sites by viewModel.sites.collectAsStateWithLifecycle()
+    val selectedSite by viewModel.selectedSite.collectAsStateWithLifecycle()
+    val siteError by viewModel.siteError.collectAsStateWithLifecycle()
+    val sitesLoading by viewModel.sitesLoading.collectAsStateWithLifecycle()
     var passwordVisible by remember { mutableStateOf(false) }
+    var siteDropdownExpanded by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     
@@ -108,7 +117,7 @@ fun LoginScreen(
                 .padding(24.dp)
                 .systemBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.Top
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -169,7 +178,9 @@ fun LoginScreen(
                 )
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
@@ -213,6 +224,101 @@ fun LoginScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // ── Site Picker Dropdown ──────────────────────────────────
+                    ExposedDropdownMenuBox(
+                        expanded = siteDropdownExpanded,
+                        onExpandedChange = { siteDropdownExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedSite?.name ?: "",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = {
+                                Text(
+                                    text = if (sitesLoading) "Loading sites..." else "Select Site",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Business,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            },
+                            trailingIcon = {
+                                if (sitesLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = siteDropdownExpanded)
+                                }
+                            },
+                            isError = siteError != null,
+                            supportingText = if (siteError != null) {
+                                { Text(siteError!!, color = MaterialTheme.colorScheme.error) }
+                            } else null,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 56.dp)
+                                .menuAnchor(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            )
+                        )
+                        ExposedDropdownMenu(
+                            expanded = siteDropdownExpanded && sites.isNotEmpty(),
+                            onDismissRequest = { siteDropdownExpanded = false }
+                        ) {
+                            if (sites.isEmpty() && !sitesLoading) {
+                                DropdownMenuItem(
+                                    text = { Text("No sites available", color = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                    onClick = { siteDropdownExpanded = false }
+                                )
+                            } else {
+                                sites.forEach { site ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(
+                                                    text = site.name,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                                Text(
+                                                    text = site.code,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            viewModel.onSiteSelected(site)
+                                            siteDropdownExpanded = false
+                                        },
+                                        leadingIcon = {
+                                            Icon(
+                                                imageVector = Icons.Default.Business,
+                                                contentDescription = null,
+                                                tint = if (selectedSite?.id == site.id)
+                                                    MaterialTheme.colorScheme.primary
+                                                else
+                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    // ────────────────────────────────────────────────────────
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
                     val isFormValid = username.isNotBlank() && password.isNotBlank()
                     PrimaryButton(
                         text = "Login",
@@ -221,16 +327,6 @@ fun LoginScreen(
                         isLoading = uiState is LoginUiState.Loading,
                         modifier = Modifier.heightIn(min = 56.dp) // Large target size
                     )
-
-                    val biometricState = uiState
-                    if (biometricState is LoginUiState.BiometricAvailable && biometricState.available) {
-                        SecondaryButton(
-                            text = "Login with Biometrics",
-                            onClick = { viewModel.loginWithBiometric() },
-                            enabled = uiState !is LoginUiState.Loading,
-                            modifier = Modifier.heightIn(min = 56.dp)
-                        )
-                    }
 
                     val errorState = uiState
                     if (errorState is LoginUiState.Error) {

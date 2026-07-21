@@ -2,6 +2,7 @@ package com.tionix.rms.feature.inventory.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tionix.rms.core.audio.BeepPlayer
 import com.tionix.rms.feature.inventory.domain.model.Box
 import com.tionix.rms.feature.inventory.domain.model.BoxStatus
 import com.tionix.rms.feature.inventory.domain.model.InventoryVerification
@@ -26,7 +27,8 @@ class InventoryVerificationViewModel @Inject constructor(
     private val startVerificationUseCase: StartVerificationUseCase,
     private val getExpectedBoxesUseCase: GetExpectedBoxesUseCase,
     private val verifyBoxUseCase: VerifyBoxUseCase,
-    private val completeVerificationUseCase: CompleteVerificationUseCase
+    private val completeVerificationUseCase: CompleteVerificationUseCase,
+    private val beepPlayer: BeepPlayer
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<InventoryVerificationUiState>(InventoryVerificationUiState.Loading)
@@ -118,13 +120,28 @@ class InventoryVerificationViewModel @Inject constructor(
             val result = verifyBoxUseCase(barcode, verificationId)
             if (result.isSuccess) {
                 val scannedBox = result.getOrNull()!!
-                _scannedBoxes.value = _scannedBoxes.value + scannedBox
-                _uiState.value = InventoryVerificationUiState.BoxScanned
+                
+                when (scannedBox.scanStatus) {
+                    ScanStatus.VERIFIED -> {
+                        _scannedBoxes.value = _scannedBoxes.value + scannedBox
+                        _uiState.value = InventoryVerificationUiState.BoxScanned
+                        beepPlayer.positive() // Verified item success
+                    }
+                    ScanStatus.UNEXPECTED -> {
+                        _scannedBoxes.value = _scannedBoxes.value + scannedBox
+                        _uiState.value = InventoryVerificationUiState.BoxScanned
+                        beepPlayer.warning() // Unexpected item warning
+                    }
+                    ScanStatus.DUPLICATE -> {
+                        beepPlayer.error() // Duplicate alert
+                    }
+                }
                 
                 // Update box status in expected boxes
                 updateBoxStatus(barcode, scannedBox.scanStatus)
             } else {
                 _uiState.value = InventoryVerificationUiState.Error(result.exceptionOrNull()?.message ?: "Scan failed")
+                beepPlayer.error()
             }
         }
     }
@@ -206,10 +223,11 @@ class InventoryVerificationViewModel @Inject constructor(
     }
 
     fun getMissingCount(): Int {
-        return _expectedBoxes.value.count { it.status == BoxStatus.MISSING }
+        return _expectedBoxes.value.count { it.status == BoxStatus.PENDING }
     }
 
     fun getUnexpectedCount(): Int {
-        return _expectedBoxes.value.count { it.status == BoxStatus.UNEXPECTED }
+        return _scannedBoxes.value.count { it.scanStatus == ScanStatus.UNEXPECTED }
     }
 }
+

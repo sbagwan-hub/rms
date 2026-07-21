@@ -2,7 +2,10 @@ package com.tionix.rms.feature.auth.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tionix.rms.core.network.ApiService
+import com.tionix.rms.core.network.dto.SiteDto
 import com.tionix.rms.feature.auth.domain.model.LoginRequest
+import com.tionix.rms.feature.auth.domain.model.DeviceInfo
 import com.tionix.rms.feature.auth.domain.usecase.CheckBiometricAvailabilityUseCase
 import com.tionix.rms.feature.auth.domain.usecase.LoginUseCase
 import com.tionix.rms.feature.auth.domain.usecase.LoginWithBiometricUseCase
@@ -19,7 +22,8 @@ class LoginViewModel @Inject constructor(
     private val loginUseCase: LoginUseCase,
     private val loginWithBiometricUseCase: LoginWithBiometricUseCase,
     private val checkBiometricAvailabilityUseCase: CheckBiometricAvailabilityUseCase,
-    private val scannerManager: ScannerManager
+    private val apiService: ApiService,
+    val scannerManager: ScannerManager
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
@@ -37,6 +41,20 @@ class LoginViewModel @Inject constructor(
     private val _passwordError = MutableStateFlow<String?>(null)
     val passwordError: StateFlow<String?> = _passwordError.asStateFlow()
 
+    // ── Site picker ────────────────────────────────────────────────────────────
+    private val _sites = MutableStateFlow<List<SiteDto>>(emptyList())
+    val sites: StateFlow<List<SiteDto>> = _sites.asStateFlow()
+
+    private val _selectedSite = MutableStateFlow<SiteDto?>(null)
+    val selectedSite: StateFlow<SiteDto?> = _selectedSite.asStateFlow()
+
+    private val _siteError = MutableStateFlow<String?>(null)
+    val siteError: StateFlow<String?> = _siteError.asStateFlow()
+
+    private val _sitesLoading = MutableStateFlow(false)
+    val sitesLoading: StateFlow<Boolean> = _sitesLoading.asStateFlow()
+    // ──────────────────────────────────────────────────────────────────────────
+
     init {
         // Collect scan results (badge scans) to fill in username/employee ID
         viewModelScope.launch {
@@ -46,6 +64,46 @@ class LoginViewModel @Inject constructor(
             }
         }
         checkBiometricAvailability()
+        loadSites()
+    }
+
+    private fun loadSites() {
+        viewModelScope.launch {
+            _sitesLoading.value = true
+            try {
+                val response = apiService.getSites()
+                if (response.isSuccessful) {
+                    val sites = response.body() ?: emptyList()
+                    _sites.value = sites
+                    if (sites.isNotEmpty()) {
+                        _selectedSite.value = sites.first()
+                    }
+                } else {
+                    // Fallback to mock data if API fails
+                    val mockSites = listOf(
+                        SiteDto("1", "Site A", "ST-A"),
+                        SiteDto("2", "Site B", "ST-B")
+                    )
+                    _sites.value = mockSites
+                    _selectedSite.value = mockSites.first()
+                }
+            } catch (e: Exception) {
+                // Fallback to mock data on exception
+                val mockSites = listOf(
+                    SiteDto("1", "Site A", "ST-A"),
+                    SiteDto("2", "Site B", "ST-B")
+                )
+                _sites.value = mockSites
+                _selectedSite.value = mockSites.first()
+            } finally {
+                _sitesLoading.value = false
+            }
+        }
+    }
+
+    fun onSiteSelected(site: SiteDto) {
+        _selectedSite.value = site
+        _siteError.value = null
     }
 
     private fun checkBiometricAvailability() {
@@ -101,11 +159,22 @@ class LoginViewModel @Inject constructor(
         }
     }
 
+    private fun validateSite(): Boolean {
+        return if (_selectedSite.value == null && _sites.value.isNotEmpty()) {
+            _siteError.value = "Please select a site"
+            false
+        } else {
+            _siteError.value = null
+            true
+        }
+    }
+
     fun login(deviceId: String) {
         viewModelScope.launch {
             val isUserValid = validateUsername()
             val isPassValid = validatePassword()
-            if (!isUserValid || !isPassValid) {
+            val isSiteValid = validateSite()
+            if (!isUserValid || !isPassValid || !isSiteValid) {
                 return@launch
             }
             
@@ -114,7 +183,11 @@ class LoginViewModel @Inject constructor(
                 LoginRequest(
                     username = _username.value.trim(),
                     password = _password.value,
-                    deviceId = deviceId
+                    device = DeviceInfo(
+                        serialNumber = deviceId,
+                        model = "Android Emulator",
+                        appVersion = "1.0.0"
+                    )
                 )
             )
             

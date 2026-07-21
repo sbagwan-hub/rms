@@ -1,5 +1,6 @@
 package com.tionix.rms.feature.dashboard.data.repository
 
+import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.feature.dashboard.data.remote.DashboardApiService
 import com.tionix.rms.feature.dashboard.data.remote.dto.toDomain
 import com.tionix.rms.feature.dashboard.domain.model.DashboardStats
@@ -21,7 +22,7 @@ class DashboardRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to fetch dashboard stats"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -34,7 +35,7 @@ class DashboardRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to fetch tasks"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -47,7 +48,7 @@ class DashboardRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to fetch tasks"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 }

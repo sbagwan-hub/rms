@@ -116,7 +116,7 @@ fun InventoryVerificationScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "Location: ${activeVerification.locationName}",
+                            text = "Box: ${activeVerification.locationName}",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -131,7 +131,7 @@ fun InventoryVerificationScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "Progress: $verifiedCount / $totalCount boxes",
+                                text = "Progress: $verifiedCount / $totalCount files",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
@@ -198,7 +198,7 @@ fun InventoryVerificationScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "Scan Box Barcode",
+                            text = "Scan File Barcode",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
@@ -206,10 +206,15 @@ fun InventoryVerificationScreen(
                         OutlinedTextField(
                             value = scannedBarcode,
                             onValueChange = viewModel::onScannedBarcodeChanged,
-                            label = { Text("Box Barcode") },
+                            label = { Text("File Barcode") },
                             modifier = Modifier.fillMaxWidth(),
                             trailingIcon = {
-                                IconButton(onClick = { viewModel.verifyBox(scannedBarcode) }) {
+                                IconButton(onClick = {
+                                    scannerManager.startCameraScan(context) { barcode ->
+                                        viewModel.onScannedBarcodeChanged(barcode)
+                                        viewModel.verifyBox(barcode)
+                                    }
+                                }) {
                                     Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
                                 }
                             }
@@ -221,7 +226,7 @@ fun InventoryVerificationScreen(
                         ) {
                             Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Verify Box")
+                            Text("Verify File")
                         }
                     }
                 }
@@ -234,7 +239,7 @@ fun InventoryVerificationScreen(
                     if (scannedBoxes.isNotEmpty()) {
                         item {
                             Text(
-                                text = "Scanned Boxes (${scannedBoxes.size})",
+                                text = "Scanned Files (${scannedBoxes.size})",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold
                             )
@@ -270,7 +275,7 @@ fun InventoryVerificationScreen(
                     if (remaining.isNotEmpty()) {
                         item {
                             Text(
-                                text = "Remaining Expected Boxes (${remaining.size})",
+                                text = "Remaining Expected Files (${remaining.size})",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold
                             )
@@ -321,7 +326,7 @@ fun InventoryVerificationScreen(
                     onDismissRequest = { viewModel.dismissDiscrepancyDialog() },
                     title = { Text("Submit with Discrepancies?") },
                     text = {
-                        Text("This verification has discrepancies:\n- Missing boxes: $missing\n- Unexpected boxes: $unexpected\n\nDo you want to proceed and submit?")
+                        Text("This verification has discrepancies:\n- Missing files: $missing\n- Unexpected files: $unexpected\n\nDo you want to proceed and submit?")
                     },
                     confirmButton = {
                         Button(onClick = { viewModel.completeVerification() }) {
@@ -359,7 +364,7 @@ fun InventoryVerificationScreen(
                             OutlinedTextField(
                                 value = selectedLocationId,
                                 onValueChange = viewModel::onLocationIdChanged,
-                                label = { Text("Location ID") },
+                                label = { Text("Box Barcode") },
                                 modifier = Modifier.fillMaxWidth()
                             )
                             

@@ -10,4 +10,7 @@ interface ScannerRepository {
     suspend fun startScanning(): Result<Unit>
     suspend fun stopScanning(): Result<Unit>
     suspend fun isScannerAvailable(): Result<Boolean>
+    fun startCameraScan(context: android.content.Context, onScanResult: ((String) -> Unit)? = null)
+    fun enableScanner()
+    fun disableScanner()
 }

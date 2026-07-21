@@ -28,7 +28,7 @@ class SearchViewModel @Inject constructor(
     private val searchUseCase: SearchUseCase,
     private val searchByBarcodeUseCase: SearchByBarcodeUseCase,
     private val getBoxDetailUseCase: GetBoxDetailUseCase,
-    private val scannerRepository: ScannerRepository,
+    val scannerRepository: ScannerRepository,
     private val initializeScannerUseCase: InitializeScannerUseCase,
     private val startScanningUseCase: StartScanningUseCase,
     private val stopScanningUseCase: StopScanningUseCase

@@ -1,5 +1,6 @@
 package com.tionix.rms.feature.refile.data.repository
 
+import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.feature.refile.data.remote.RefileApiService
 import com.tionix.rms.feature.refile.data.remote.dto.toDomain
 import com.tionix.rms.feature.refile.data.remote.dto.toDto
@@ -24,7 +25,7 @@ class RefileRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to fetch refiles"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -37,7 +38,7 @@ class RefileRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to start refile"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
@@ -50,7 +51,7 @@ class RefileRepositoryImpl @Inject constructor(
                 Result.failure(Exception("Failed to complete refile"))
             }
         } catch (e: Exception) {
-            Result.failure(e)
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
 
