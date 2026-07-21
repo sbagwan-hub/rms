@@ -213,11 +213,17 @@ private fun EntityHeader(result: LookupData, recorded: Boolean) {
                 }
             }
 
-            // Location capacity gauge
-            if (result.entityType == "LOCATION" && result.entity.capacity != null) {
+            // Occupancy gauge — Location shows boxes-in-location, Box shows files-in-box
+            if (result.entity.capacity != null) {
+                val unit = if (result.entityType == "BOX") "files" else "boxes"
+                val occupied = result.entity.occupied ?: 0
+                val capacity = result.entity.capacity
+                val overCapacity = occupied > capacity
                 Text(
-                    "Occupancy: ${result.entity.occupied ?: 0} / ${result.entity.capacity} boxes",
+                    "Occupancy: $occupied / $capacity $unit",
                     style = MaterialTheme.typography.bodyMedium,
+                    color = if (overCapacity) MaterialTheme.colorScheme.error
+                    else MaterialTheme.colorScheme.onSurface,
                 )
             }
 

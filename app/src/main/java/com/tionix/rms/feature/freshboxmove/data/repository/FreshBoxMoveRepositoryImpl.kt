@@ -1,5 +1,8 @@
 package com.tionix.rms.feature.freshboxmove.data.repository
 
+import android.content.Context
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
 import com.google.gson.Gson
 import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.core.sync.data.local.SyncOperationDao
@@ -9,6 +12,8 @@ import com.tionix.rms.feature.freshboxmove.data.local.FreshBoxDao
 import com.tionix.rms.feature.freshboxmove.data.local.FreshBoxScanEntity
 import com.tionix.rms.feature.freshboxmove.data.local.FreshBoxSessionEntity
 import com.tionix.rms.feature.freshboxmove.domain.repository.FreshBoxMoveRepository
+import com.tionix.rms.feature.sync.data.SyncWorker
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
 import java.text.SimpleDateFormat
@@ -21,8 +26,14 @@ import javax.inject.Inject
 class FreshBoxMoveRepositoryImpl @Inject constructor(
     private val freshBoxDao: FreshBoxDao,
     private val syncOperationDao: SyncOperationDao,
-    private val authPreferences: AuthPreferences
+    private val authPreferences: AuthPreferences,
+    @param:ApplicationContext private val context: Context,
 ) : FreshBoxMoveRepository {
+
+    /** Nudge the sync queue right away rather than waiting for the next periodic run. */
+    private fun triggerImmediateSync() {
+        WorkManager.getInstance(context).enqueue(OneTimeWorkRequestBuilder<SyncWorker>().build())
+    }
 
     private val gson = Gson()
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
@@ -62,6 +73,7 @@ class FreshBoxMoveRepositoryImpl @Inject constructor(
                 errorMessage = null
             )
             syncOperationDao.insert(syncOperation)
+            triggerImmediateSync()
 
             Result.success(sessionEntity)
         } catch (e: Exception) {
@@ -116,6 +128,7 @@ class FreshBoxMoveRepositoryImpl @Inject constructor(
                 errorMessage = null
             )
             syncOperationDao.insert(syncOperation)
+            triggerImmediateSync()
 
             Result.success(scanEntity)
         } catch (e: Exception) {
@@ -147,6 +160,7 @@ class FreshBoxMoveRepositoryImpl @Inject constructor(
                 errorMessage = null
             )
             syncOperationDao.insert(syncOperation)
+            triggerImmediateSync()
 
             Result.success(Unit)
         } catch (e: Exception) {

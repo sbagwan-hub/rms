@@ -1,5 +1,6 @@
 package com.tionix.rms.feature.freshboxmove.data.remote
 
+import com.google.gson.annotations.SerializedName
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -41,9 +42,11 @@ data class FreshBoxMoveSessionDto(
 data class SubmitScanRequestDto(
     val locationBarcode: String,
     val boxBarcode: String,
-    val clientEventId: String,
-    val gpsLat: Double?,
-    val gpsLng: Double?,
+    // Wire contract is "clientOpId" (backend's submitScanSchema); kept as
+    // clientEventId locally to match the Room entity / idempotency-key naming.
+    @SerializedName("clientOpId") val clientEventId: String,
+    @SerializedName("latitude") val gpsLat: Double?,
+    @SerializedName("longitude") val gpsLng: Double?,
     val scannedAt: String
 )
 
