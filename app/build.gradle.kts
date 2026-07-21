@@ -106,6 +106,13 @@ dependencies {
     implementation(libs.androidx.work.runtime)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.hilt.work)
+    // Separate from com.google.dagger:hilt-compiler above — this is the
+    // androidx.hilt processor that actually generates the WorkerAssistedFactory
+    // bindings @HiltWorker needs. Without it, HiltWorkerFactory installs fine
+    // but has no knowledge of any worker class, silently falls back to
+    // WorkManager's default reflection factory, and every @HiltWorker
+    // (constructor-injected dependencies) fails with NoSuchMethodException.
+    ksp(libs.androidx.hilt.compiler)
     ksp(libs.hilt.compiler)
 
     // Google Play Services Code Scanner for camera-based QR / Barcode scanning
