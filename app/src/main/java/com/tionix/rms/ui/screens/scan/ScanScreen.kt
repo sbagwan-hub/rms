@@ -185,7 +185,7 @@ private fun EntityHeader(result: LookupData, recorded: Boolean) {
             // Breadcrumb: Company › Branch › WH › Site › Room › Rack › Shelf › Location
             if (result.path.isNotEmpty()) {
                 Text(
-                    result.path.joinToString(" › "),
+                    result.path.joinToString(" › ") { it.name },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
