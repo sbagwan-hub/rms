@@ -107,17 +107,28 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun refreshToken(): AuthResult {
+    override suspend fun refreshToken(refreshToken: String): AuthResult {
         return try {
-            val response = apiService.refreshToken()
+            val response = apiService.refreshToken(
+                com.tionix.rms.feature.auth.data.remote.dto.RefreshRequestDto(refreshToken)
+            )
             if (response.isSuccessful && response.body() != null) {
-                val loginResponse = response.body()!!
-                preferences.setAccessToken(loginResponse.accessToken)
-                preferences.setRefreshToken(loginResponse.refreshToken)
+                val refreshed = response.body()!!
+                preferences.setAccessToken(refreshed.accessToken)
+                preferences.setRefreshToken(refreshed.refreshToken)
+                // The refresh endpoint doesn't re-send the user object — reuse
+                // whatever was cached at login time rather than treat it as missing.
+                val roleStr = preferences.getRole() ?: "OPERATOR"
+                val role = try { UserRole.valueOf(roleStr) } catch (e: Exception) { UserRole.OPERATOR }
                 AuthResult.Success(
-                    accessToken = loginResponse.accessToken,
-                    refreshToken = loginResponse.refreshToken,
-                    user = loginResponse.user.toDomain()
+                    accessToken = refreshed.accessToken,
+                    refreshToken = refreshed.refreshToken,
+                    user = User(
+                        id = preferences.getUserId() ?: "",
+                        fullName = preferences.getFullName() ?: "",
+                        email = preferences.getEmail() ?: "",
+                        role = role
+                    )
                 )
             } else {
                 AuthResult.Error("Token refresh failed")

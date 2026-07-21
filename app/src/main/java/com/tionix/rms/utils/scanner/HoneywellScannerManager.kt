@@ -27,6 +27,36 @@ class HoneywellScannerManager @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) : ScannerManager {
 
+    companion object {
+        // Honeywell Android Data Collection Intent API — action + extra key
+        // constants below are taken verbatim from Honeywell's published Intent
+        // API guide. Using anything else (e.g. a made-up ACTION_SET_PROPERTIES,
+        // or an EXTRA_CONTROL key) is silently ignored by the on-device
+        // DCS-IntentApi receiver — it does not error, it just does nothing.
+        private const val ACTION_CLAIM_SCANNER = "com.honeywell.aidc.action.ACTION_CLAIM_SCANNER"
+        private const val ACTION_RELEASE_SCANNER = "com.honeywell.aidc.action.ACTION_RELEASE_SCANNER"
+        private const val ACTION_CONTROL_SCANNER = "com.honeywell.aidc.action.ACTION_CONTROL_SCANNER"
+
+        private const val EXTRA_PROPERTIES = "com.honeywell.aidc.extra.EXTRA_PROPERTIES"
+        private const val EXTRA_SCAN = "com.honeywell.aidc.extra.EXTRA_SCAN"
+        private const val EXTRA_AIM = "com.honeywell.aidc.extra.EXTRA_AIM"
+        private const val EXTRA_LIGHT = "com.honeywell.aidc.extra.EXTRA_LIGHT"
+        private const val EXTRA_DECODE = "com.honeywell.aidc.extra.EXTRA_DECODE"
+
+        /** Our own action — configured into the scanner via DPR_DATA_INTENT_ACTION below. */
+        private const val ACTION_BARCODE_DATA = "com.tionix.rms.ACTION_BARCODE_DATA"
+    }
+
+    // Deliberately implicit (no setPackage): `dumpsys package` on the EDA52 test
+    // unit lists the IntentApiReceiver under com.honeywell.tools.scanner.edge,
+    // but the process that actually logs DCS-IntentApi and handles the broadcast
+    // is com.intermec.datacollectionservice (they share a process/UID on this
+    // firmware). Restricting to either package name by Intent.setPackage caused
+    // the broadcast to silently fail to resolve. Implicit delivery — despite an
+    // accompanying "Background execution not allowed" warning — was confirmed
+    // working end-to-end (claim succeeds, aim/light/decode engage).
+    private fun honeywellIntent(action: String) = Intent(action)
+
     private val _scanResults = MutableSharedFlow<String>(extraBufferCapacity = 64)
     override val scanResults: SharedFlow<String> = _scanResults.asSharedFlow()
 
@@ -34,20 +64,21 @@ class HoneywellScannerManager @Inject constructor(
     override val isScanning: StateFlow<Boolean> = _isScanning.asStateFlow()
 
     private var isRegistered = false
+    private var isClaimed = false
     private var continuousMode = false
 
     private val scannerReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent == null) return
-            
-            // Extract the barcode string from Honeywell intent
-            // "barcode_string" is Honeywell's default extra key for data.
-            // Also checking "data" and "barcode" as common fallback keys.
-            val barcode = intent.getStringExtra("barcode_string")
-                ?: intent.getStringExtra("data")
+
+            // Extract the barcode string from the configured data intent.
+            // "data" is Honeywell's documented extra key; the others are
+            // kept as fallbacks for older/alternate firmware configurations.
+            val barcode = intent.getStringExtra("data")
+                ?: intent.getStringExtra("barcode_string")
                 ?: intent.getStringExtra("barcode")
                 ?: intent.getStringExtra("value")
-                
+
             if (barcode != null) {
                 CoroutineScope(Dispatchers.Default).launch {
                     _scanResults.emit(barcode.trim())
@@ -59,9 +90,7 @@ class HoneywellScannerManager @Inject constructor(
     override fun enable() {
         if (!isRegistered) {
             val filter = IntentFilter().apply {
-                addAction("com.honeywell.decodeservice.RESULT_TO_APP")
-                addAction("com.tionix.rms.ACTION_BARCODE_DATA")
-                addAction("android.intent.action.BARCODE_RESULT")
+                addAction(ACTION_BARCODE_DATA)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 context.registerReceiver(scannerReceiver, filter, Context.RECEIVER_EXPORTED)
@@ -69,12 +98,8 @@ class HoneywellScannerManager @Inject constructor(
                 context.registerReceiver(scannerReceiver, filter)
             }
             isRegistered = true
-            
-            // Claim Honeywell imager via broadcast API
-            sendScannerCommand("com.honeywell.aidc.action.ACTION_CLAIM_SCANNER", claim = true)
-            // Apply current continuous mode configuration
-            applyProperties()
         }
+        claimScanner()
     }
 
     override fun disable() {
@@ -86,66 +111,67 @@ class HoneywellScannerManager @Inject constructor(
             }
             isRegistered = false
             _isScanning.value = false
-            
-            // Release Honeywell imager
-            sendScannerCommand("com.honeywell.aidc.action.ACTION_RELEASE_SCANNER", claim = false)
+        }
+        if (isClaimed) {
+            context.sendBroadcast(honeywellIntent(ACTION_RELEASE_SCANNER))
+            isClaimed = false
         }
     }
 
     override fun startScanTrigger() {
         _isScanning.value = true
-        // Action to trigger hardware scan programmatically
-        // Honeywell intent for software trigger control
-        val intent = Intent("com.honeywell.aidc.action.ACTION_CONTROL_SCANNER").apply {
-            putExtra("com.honeywell.aidc.extra.EXTRA_CONTROL", true)
-            putExtra("packageName", context.packageName)
+        // Set EXTRA_AIM/LIGHT/DECODE explicitly rather than relying on their
+        // documented "defaults to EXTRA_SCAN" behavior — observed on-device
+        // logs (DCS-IntentApi) show them read as false when omitted, even
+        // with EXTRA_SCAN=true.
+        val intent = honeywellIntent(ACTION_CONTROL_SCANNER).apply {
+            putExtra(EXTRA_SCAN, true)
+            putExtra(EXTRA_AIM, true)
+            putExtra(EXTRA_LIGHT, true)
+            putExtra(EXTRA_DECODE, true)
         }
         context.sendBroadcast(intent)
     }
 
     override fun stopScanTrigger() {
         _isScanning.value = false
-        val intent = Intent("com.honeywell.aidc.action.ACTION_CONTROL_SCANNER").apply {
-            putExtra("com.honeywell.aidc.extra.EXTRA_CONTROL", false)
-            putExtra("packageName", context.packageName)
+        val intent = honeywellIntent(ACTION_CONTROL_SCANNER).apply {
+            putExtra(EXTRA_SCAN, false)
+            putExtra(EXTRA_AIM, false)
+            putExtra(EXTRA_LIGHT, false)
+            putExtra(EXTRA_DECODE, false)
         }
         context.sendBroadcast(intent)
     }
 
     override fun setContinuousMode(enabled: Boolean) {
         continuousMode = enabled
-        applyProperties()
+        // Properties only take effect via a (re-)claim, not a standalone action.
+        if (isClaimed) claimScanner()
     }
 
-    private fun sendScannerCommand(action: String, claim: Boolean) {
-        val intent = Intent(action).apply {
-            putExtra("packageName", context.packageName)
-        }
-        context.sendBroadcast(intent)
-    }
-
-    private fun applyProperties() {
-        // Honeywell supports setting properties via intents:
-        // Action: "com.honeywell.aidc.action.ACTION_SET_PROPERTIES"
-        // Extras package: "properties" Bundle containing property key-value pairs.
+    /**
+     * Claims the imager and, in the same intent, configures it to deliver
+     * decode results via [ACTION_BARCODE_DATA] rather than the default
+     * "Data Processing Result" toast/notification. Per Honeywell's Intent
+     * API, EXTRA_PROPERTIES must be attached to ACTION_CLAIM_SCANNER itself
+     * — there is no separate "set properties" action.
+     */
+    private fun claimScanner() {
         val properties = Bundle().apply {
             putBoolean("DPR_DATA_INTENT", true)
-            putString("DPR_DATA_INTENT_ACTION", "com.tionix.rms.ACTION_BARCODE_DATA")
+            putString("DPR_DATA_INTENT_ACTION", ACTION_BARCODE_DATA)
             if (continuousMode) {
-                // trigger_control_mode: "disable" (0), "one_shot" (1), "continuous" (2), "auto_control" (3)
                 putString("property_trigger_control_mode", "continuous")
-                putInt("trigger_control_mode", 2)
             } else {
                 putString("property_trigger_control_mode", "one_shot")
-                putInt("trigger_control_mode", 1)
             }
         }
-
-        val intent = Intent("com.honeywell.aidc.action.ACTION_SET_PROPERTIES").apply {
-            putExtra("properties", properties)
-            putExtra("packageName", context.packageName)
+        val intent = honeywellIntent(ACTION_CLAIM_SCANNER).apply {
+            putExtra(EXTRA_PROPERTIES, properties)
         }
         context.sendBroadcast(intent)
+        isClaimed = true
     }
 
     override fun startCameraScan(context: Context, onScanResult: ((String) -> Unit)?) {

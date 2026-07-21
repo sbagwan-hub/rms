@@ -16,14 +16,20 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import okhttp3.Authenticator
 import okhttp3.Interceptor
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
+import okhttp3.Route
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import com.google.gson.JsonParser
+import kotlinx.coroutines.runBlocking
 import javax.inject.Singleton
 
 /**
@@ -31,7 +37,7 @@ import javax.inject.Singleton
  * The admin-only surface (`/api/v1/admin/`) is out of scope for this app.
  * 10.0.2.2 is the Android emulator's alias for the host machine's localhost.
  */
-private const val BASE_URL = "http://10.0.2.2:4000/api/v1/mobile/"
+private const val BASE_URL = "http://192.168.1.4:3001/api/v1/mobile/"
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -56,14 +62,28 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(authInterceptor: Interceptor): OkHttpClient {
+    fun provideTokenAuthenticator(preferences: AuthPreferences): Authenticator =
+        TokenAuthenticator(preferences)
+
+    @Provides
+    @Singleton
+    fun provideOkHttpClient(authInterceptor: Interceptor, tokenAuthenticator: Authenticator): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
         }
+
         return OkHttpClient.Builder()
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
             .addInterceptor(authInterceptor)
             .addInterceptor(EnvelopeUnwrappingInterceptor())
             .addInterceptor(logging)
+            // Access tokens expire after 15 minutes (backend ACCESS_TOKEN_EXPIRY).
+            // Without this, every request made after the token expires fails with
+            // a bare 401 and screens show a generic "Failed to fetch..." error
+            // until the user manually logs out and back in.
+            .authenticator(tokenAuthenticator)
             .build()
     }
 
@@ -135,6 +155,88 @@ object NetworkModule {
     @Singleton
     fun provideApiService(retrofit: Retrofit): ApiService =
         retrofit.create(ApiService::class.java)
+}
+
+/**
+ * On a 401 response, calls POST auth/refresh with the stored refresh token and
+ * retries the original request with the new access token. Runs on OkHttp's own
+ * dispatcher thread (never the main thread), so blocking DataStore reads/writes
+ * via [runBlocking] are safe here — this is OkHttp's documented pattern for
+ * Authenticators backed by suspend-based token storage.
+ *
+ * Uses a bare OkHttpClient (no auth interceptor) for the refresh call itself,
+ * to avoid recursing back into this same authenticator.
+ */
+class TokenAuthenticator(
+    private val preferences: AuthPreferences,
+) : Authenticator {
+
+    private val refreshClient = OkHttpClient.Builder()
+        .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+
+    override fun authenticate(route: Route?, response: Response): Request? {
+        val path = response.request.url.encodedPath
+        if (path.endsWith("auth/login") || path.endsWith("auth/refresh")) {
+            // A 401 here means bad credentials or a dead refresh token, not an
+            // expired access token — retrying would just mask the real error.
+            return null
+        }
+        if (responseCount(response) >= 2) {
+            return null // already retried once for this request — give up
+        }
+
+        val refreshToken = runBlocking { preferences.getRefreshToken() }
+        if (refreshToken.isNullOrBlank()) return null
+
+        val newAccessToken = runBlocking { callRefresh(refreshToken) }
+        if (newAccessToken == null) {
+            // Refresh token itself is dead — clear the session so the next
+            // screen load's session check routes back to Login (07-navigation.md).
+            runBlocking { preferences.clear() }
+            return null
+        }
+
+        return response.request.newBuilder()
+            .header("Authorization", "Bearer $newAccessToken")
+            .build()
+    }
+
+    private suspend fun callRefresh(refreshToken: String): String? {
+        val requestBody = """{"refreshToken":"$refreshToken"}"""
+            .toRequestBody("application/json; charset=utf-8".toMediaType())
+        val request = Request.Builder()
+            .url(BASE_URL + "auth/refresh")
+            .post(requestBody)
+            .build()
+
+        return try {
+            refreshClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val bodyStr = resp.body?.string() ?: return null
+                val json = JsonParser.parseString(bodyStr).asJsonObject
+                val data = if (json.has("data")) json.getAsJsonObject("data") else json
+                val newAccessToken = data.get("accessToken")?.asString ?: return null
+                val newRefreshToken = data.get("refreshToken")?.asString
+                preferences.setAccessToken(newAccessToken)
+                if (newRefreshToken != null) preferences.setRefreshToken(newRefreshToken)
+                newAccessToken
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun responseCount(response: Response): Int {
+        var result = 1
+        var prior = response.priorResponse
+        while (prior != null) {
+            result++
+            prior = prior.priorResponse
+        }
+        return result
+    }
 }
 
 /**

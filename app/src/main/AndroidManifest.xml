@@ -6,6 +6,16 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="com.honeywell.scanneredge.permission.DECODE" />
 
+    <!--
+        Android 11+ package visibility: without this, PackageManager.getPackageInfo()
+        for the Honeywell DataCollection service always throws NameNotFoundException
+        even when the package is installed, causing ScannerAvailability.detect() to
+        wrongly report Mode.CAMERA on real Honeywell hardware.
+    -->
+    <queries>
+        <package android:name="com.intermec.datacollectionservice" />
+    </queries>
+
     <application
         android:name=".RmsApplication"
         android:allowBackup="true"

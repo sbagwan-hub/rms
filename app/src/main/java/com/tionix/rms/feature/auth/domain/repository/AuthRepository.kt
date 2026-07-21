@@ -7,6 +7,6 @@ interface AuthRepository {
     suspend fun login(request: LoginRequest): AuthResult
     suspend fun loginWithBiometric(): AuthResult
     suspend fun logout(): AuthResult
-    suspend fun refreshToken(): AuthResult
+    suspend fun refreshToken(refreshToken: String): AuthResult
     suspend fun isBiometricAvailable(): Boolean
 }

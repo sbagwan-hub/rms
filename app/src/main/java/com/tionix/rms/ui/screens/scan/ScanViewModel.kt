@@ -56,7 +56,15 @@ class ScanViewModel @Inject constructor(
 
     init {
         // Detect once: real Honeywell imager present, or camera fallback?
-        _state.update { it.copy(scannerMode = ScannerAvailability.detect(appContext)) }
+        val mode = ScannerAvailability.detect(appContext)
+        _state.update { it.copy(scannerMode = mode) }
+
+        // Claim the Honeywell imager for this screen's lifetime — without this,
+        // the physical/software trigger fires but the decoder rejects it
+        // ("Scanner is not claimed").
+        if (mode == ScannerAvailability.Mode.HONEYWELL_IMAGER) {
+            scanner.enable()
+        }
 
         // CONTINUOUS SCAN: physical trigger OR software trigger — both deliver
         // decodes through this single flow. A decode also ends software-scan mode.
@@ -110,6 +118,9 @@ class ScanViewModel @Inject constructor(
     override fun onCleared() {
         // Screen destroyed while beam on → make sure the imager is released
         stopBeam()
+        if (_state.value.scannerMode == ScannerAvailability.Mode.HONEYWELL_IMAGER) {
+            scanner.disable()
+        }
         super.onCleared()
     }
 
