@@ -10,15 +10,15 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 
 interface TransferApiService {
-    @GET("transfers/assigned")
+    @GET("workflows/custody/transfers/assigned")
     suspend fun getAssignedTransfers(): Response<List<TransferDto>>
 
-    @POST("transfers")
+    @POST("workflows/custody/transfers")
     suspend fun startTransfer(@Body request: StartTransferRequestDto): Response<TransferDto>
 
-    @PUT("transfers/{id}/complete")
+    @PUT("workflows/custody/transfers/{id}/complete")
     suspend fun completeTransfer(@Path("id") id: String): Response<Unit>
 
-    @GET("transfers/scan/{barcode}")
+    @GET("workflows/custody/transfers/scan/{barcode}")
     suspend fun scanBox(@Path("barcode") barcode: String): Response<TransferDto?>
 }

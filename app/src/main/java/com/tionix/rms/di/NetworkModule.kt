@@ -37,7 +37,7 @@ import javax.inject.Singleton
  * The admin-only surface (`/api/v1/admin/`) is out of scope for this app.
  * 10.0.2.2 is the Android emulator's alias for the host machine's localhost.
  */
-private const val BASE_URL = "http://192.168.1.4:3001/api/v1/mobile/"
+private const val BASE_URL = "http://192.168.1.6:3001/api/v1/mobile/"
 
 @Module
 @InstallIn(SingletonComponent::class)

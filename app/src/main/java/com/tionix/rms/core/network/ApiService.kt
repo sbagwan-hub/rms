@@ -31,36 +31,6 @@ interface ApiService {
         @Body request: ScanRequest
     ): Response<Unit>
 
-    @POST("workflows/fresh-box")
-    suspend fun submitFreshBox(
-        @Body request: FreshBoxRequest
-    ): Response<FreshBoxResponse>
-
-    @POST("workflows/inventory")
-    suspend fun submitInventory(
-        @Body request: InventoryRequest
-    ): Response<InventoryResponse>
-
-    @GET("workflows/refile/target")
-    suspend fun getRefileTarget(
-        @Query("fileBarcode") fileBarcode: String
-    ): Response<RefileTargetResponse>
-
-    @POST("workflows/refile")
-    suspend fun submitRefile(
-        @Body request: RefileRequest
-    ): Response<Unit>
-
-    @GET("workflows/segregation/check")
-    suspend fun checkSegregation(
-        @Query("oldBoxBarcode") oldBoxBarcode: String,
-        @Query("fileBarcode") fileBarcode: String
-    ): Response<SegregationCheckResponse>
-
-    @POST("workflows/segregation")
-    suspend fun submitSegregation(
-        @Body request: SegregationRequest
-    ): Response<SegregationResponse>
     @GET("sites/public")
     suspend fun getSites(): Response<List<SiteDto>>
 }
