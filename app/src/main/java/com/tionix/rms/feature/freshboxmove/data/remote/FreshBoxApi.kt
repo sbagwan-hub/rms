@@ -42,9 +42,9 @@ data class FreshBoxMoveSessionDto(
 data class SubmitScanRequestDto(
     val locationBarcode: String,
     val boxBarcode: String,
-    // Wire contract is "clientOpId" (backend's submitScanSchema); kept as
-    // clientEventId locally to match the Room entity / idempotency-key naming.
     @SerializedName("clientOpId") val clientEventId: String,
+    val roomBarcode: String? = null,
+    val rackBarcode: String? = null,
     @SerializedName("latitude") val gpsLat: Double?,
     @SerializedName("longitude") val gpsLng: Double?,
     val scannedAt: String

@@ -2,79 +2,63 @@ package com.tionix.rms.feature.history.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.tionix.rms.feature.history.domain.model.ActionFilter
-import com.tionix.rms.feature.history.domain.model.DateFilter
-import com.tionix.rms.feature.history.domain.usecase.GetHistoryUseCase
-import com.tionix.rms.feature.history.domain.usecase.RetrySyncUseCase
+import com.tionix.rms.feature.history.domain.repository.HistoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
-    private val getHistoryUseCase: GetHistoryUseCase,
-    private val retrySyncUseCase: RetrySyncUseCase
+    private val historyRepository: HistoryRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow<HistoryUiState>(HistoryUiState.Loading)
+    private val _uiState = MutableStateFlow(HistoryUiState())
     val uiState: StateFlow<HistoryUiState> = _uiState.asStateFlow()
 
-    private val _actionFilter = MutableStateFlow(ActionFilter.ALL)
-    val actionFilter: StateFlow<ActionFilter> = _actionFilter.asStateFlow()
-
-    private val _dateFilter = MutableStateFlow(DateFilter.ALL)
-    val dateFilter: StateFlow<DateFilter> = _dateFilter.asStateFlow()
-
-    private val _currentUserId = MutableStateFlow<String?>(null)
-    val currentUserId: StateFlow<String?> = _currentUserId.asStateFlow()
-
     init {
-        loadHistory()
+        viewModelScope.launch {
+            historyRepository.observePendingOperations().collect { pending ->
+                _uiState.update { it.copy(pendingOps = pending) }
+            }
+        }
+        loadSynced()
     }
 
-    fun loadHistory() {
+    fun selectTab(tab: HistoryTab) {
+        _uiState.update { it.copy(selectedTab = tab) }
+        if (tab == HistoryTab.SYNCED) {
+            loadSynced()
+        }
+    }
+
+    fun loadSynced() {
         viewModelScope.launch {
-            _uiState.value = HistoryUiState.Loading
-            val result = getHistoryUseCase(
-                actionFilter = _actionFilter.value,
-                dateFilter = _dateFilter.value,
-                userId = _currentUserId.value
-            )
-            
-            if (result.isSuccess) {
-                _uiState.value = HistoryUiState.Success(result.getOrNull() ?: emptyList())
-            } else {
-                _uiState.value = HistoryUiState.Error(result.exceptionOrNull()?.message ?: "Failed to load history")
+            _uiState.update { it.copy(loadingSynced = true, syncedError = null) }
+            val result = historyRepository.getSyncedOperations()
+            _uiState.update {
+                if (result.isSuccess) {
+                    it.copy(
+                        loadingSynced = false,
+                        syncedOps = result.getOrNull().orEmpty(),
+                        syncedError = null
+                    )
+                } else {
+                    it.copy(
+                        loadingSynced = false,
+                        syncedError = result.exceptionOrNull()?.message ?: "Failed to load synced operations"
+                    )
+                }
             }
         }
     }
 
-    fun setActionFilter(filter: ActionFilter) {
-        _actionFilter.value = filter
-        loadHistory()
-    }
-
-    fun setDateFilter(filter: DateFilter) {
-        _dateFilter.value = filter
-        loadHistory()
-    }
-
-    fun setUserId(userId: String?) {
-        _currentUserId.value = userId
-        loadHistory()
-    }
-
-    fun retrySync(historyItemId: String) {
+    fun manualSync() {
         viewModelScope.launch {
-            val result = retrySyncUseCase(historyItemId)
-            if (result.isSuccess) {
-                loadHistory()
-            } else {
-                _uiState.value = HistoryUiState.Error(result.exceptionOrNull()?.message ?: "Failed to retry sync")
-            }
+            historyRepository.triggerManualSync()
         }
     }
 }

@@ -5,8 +5,6 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.callbackFlow
@@ -15,7 +13,8 @@ import javax.inject.Singleton
 
 @Singleton
 class NetworkMonitor @Inject constructor(
-    @param:ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context,
+    private val syncScheduler: SyncScheduler
 ) {
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     
@@ -44,11 +43,7 @@ class NetworkMonitor @Inject constructor(
     }
     
     private fun triggerSyncOnConnectivityRegain() {
-        val syncRequest = OneTimeWorkRequestBuilder<SyncWorker>()
-            .addTag(SyncWorker.WORK_NAME)
-            .build()
-        
-        WorkManager.getInstance(context).enqueue(syncRequest)
+        syncScheduler.scheduleImmediateSync()
     }
     
     fun isNetworkAvailable(): Boolean {

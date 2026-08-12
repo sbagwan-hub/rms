@@ -125,6 +125,9 @@ fun RmsNavGraph() {
                         }
                         navController.navigate(route)
                     },
+                    onSearch = { navController.navigate(RmsRoutes.SEARCH) },
+                    onHistory = { navController.navigate(RmsRoutes.HISTORY) },
+                    onProfile = { navController.navigate(RmsRoutes.PROFILE) },
                     onLogout = {
                         navController.navigate(RmsRoutes.LOGIN) {
                             popUpTo(0) { inclusive = true }
@@ -184,11 +187,7 @@ fun RmsNavGraph() {
             }
 
             composable(RmsRoutes.HISTORY) {
-                HistoryScreen(
-                    onBack = { navController.popBackStack() },
-                    userRole = "OPERATOR",
-                    userId = "user-123"
-                )
+                HistoryScreen(onBack = { navController.popBackStack() })
             }
 
             composable(RmsRoutes.SETTINGS) {
@@ -210,6 +209,7 @@ fun RmsNavGraph() {
 
             composable(RmsRoutes.PROFILE) {
                 ProfileScreen(
+                    onSettings = { navController.navigate(RmsRoutes.SETTINGS) },
                     onLogout = {
                         navController.navigate(RmsRoutes.LOGIN) {
                             popUpTo(0) { inclusive = true }

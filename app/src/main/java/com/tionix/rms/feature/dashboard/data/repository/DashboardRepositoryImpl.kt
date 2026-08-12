@@ -2,15 +2,18 @@ package com.tionix.rms.feature.dashboard.data.repository
 
 import com.tionix.rms.core.network.ErrorUtils
 import com.tionix.rms.feature.dashboard.data.remote.DashboardApiService
+import com.tionix.rms.feature.dashboard.data.remote.DashboardReportsApiService
 import com.tionix.rms.feature.dashboard.data.remote.dto.toDomain
 import com.tionix.rms.feature.dashboard.domain.model.DashboardStats
+import com.tionix.rms.feature.dashboard.domain.model.ReportsSummary
 import com.tionix.rms.feature.dashboard.domain.model.Task
 import com.tionix.rms.feature.dashboard.domain.model.TaskStatus
 import com.tionix.rms.feature.dashboard.domain.repository.DashboardRepository
 import javax.inject.Inject
 
 class DashboardRepositoryImpl @Inject constructor(
-    private val apiService: DashboardApiService
+    private val apiService: DashboardApiService,
+    private val reportsApiService: DashboardReportsApiService
 ) : DashboardRepository {
 
     override suspend fun getDashboardStats(): Result<DashboardStats> {
@@ -46,6 +49,19 @@ class DashboardRepositoryImpl @Inject constructor(
                 Result.success(response.body()!!.map { it.toDomain() })
             } else {
                 Result.failure(Exception("Failed to fetch tasks"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
+        }
+    }
+
+    override suspend fun getReportsSummary(): Result<ReportsSummary> {
+        return try {
+            val response = reportsApiService.getSummary()
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!.toDomain())
+            } else {
+                Result.failure(Exception("Failed to fetch reports summary"))
             }
         } catch (e: Exception) {
             Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))

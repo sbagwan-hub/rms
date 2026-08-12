@@ -39,6 +39,9 @@ fun FreshBoxMoveScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val activeSession by viewModel.activeSession.collectAsStateWithLifecycle()
+    val step by viewModel.step.collectAsStateWithLifecycle()
+    val roomBarcode by viewModel.roomBarcode.collectAsStateWithLifecycle()
+    val rackBarcode by viewModel.rackBarcode.collectAsStateWithLifecycle()
     val locationBarcode by viewModel.locationBarcode.collectAsStateWithLifecycle()
     val boxBarcode by viewModel.boxBarcode.collectAsStateWithLifecycle()
     val lockLocation by viewModel.lockLocation.collectAsStateWithLifecycle()
@@ -68,6 +71,12 @@ fun FreshBoxMoveScreen(
     LaunchedEffect(Unit) {
         viewModel.duplicateScanWarning.collect { warningMessage ->
             Toast.makeText(context, warningMessage, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    LaunchedEffect(uiState) {
+        if (uiState is FreshBoxMoveUiState.Error) {
+            Toast.makeText(context, (uiState as FreshBoxMoveUiState.Error).message, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -146,100 +155,56 @@ fun FreshBoxMoveScreen(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Location Card
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .border(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                    shape = RoundedCornerShape(12.dp)
-                                ),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surface
-                            )
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Warehouse Location",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    if (locationBarcode.isNotBlank()) {
-                                        TextButton(onClick = viewModel::resetLocation) {
-                                            Text("Change Location", color = MaterialTheme.colorScheme.error)
+                        FreshBoxStepHeader(currentStep = step)
+
+                        when (step) {
+                            FreshBoxMoveViewModel.STEP_ROOM, FreshBoxMoveViewModel.STEP_RACK -> {
+                                HierarchyScanCard(
+                                    title = if (step == FreshBoxMoveViewModel.STEP_ROOM) "Scan Room" else "Scan Rack",
+                                    hint = if (step == FreshBoxMoveViewModel.STEP_ROOM) {
+                                        "Scan the room barcode, or skip if no label is available."
+                                    } else {
+                                        "Scan the rack barcode, or skip if no label is available."
+                                    },
+                                    scannedValue = if (step == FreshBoxMoveViewModel.STEP_ROOM) roomBarcode else rackBarcode,
+                                    onSkip = { viewModel.skipStep() },
+                                    onManualEntry = { viewModel.handleBarcodeScan(it) },
+                                    onCameraScan = {
+                                        scannerManager.startCameraScan(context) { barcode ->
+                                            viewModel.handleBarcodeScan(barcode)
                                         }
                                     }
-                                }
-
-                                if (locationBarcode.isBlank()) {
-                                    OutlinedTextField(
-                                        value = locationBarcode,
-                                        onValueChange = { viewModel.handleBarcodeScan(it) },
-                                        label = { Text("Scan or Enter Location Barcode") },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        trailingIcon = {
-                                            IconButton(
-                                                onClick = {
-                                                    scannerManager.startCameraScan(context) { barcode ->
-                                                        viewModel.handleBarcodeScan(barcode)
-                                                    }
-                                                }
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.QrCodeScanner,
-                                                    contentDescription = "Scan Location",
-                                                    tint = MaterialTheme.colorScheme.primary
-                                                )
-                                            }
+                                )
+                            }
+                            FreshBoxMoveViewModel.STEP_LOCATION -> {
+                                HierarchyScanCard(
+                                    title = "Scan Location",
+                                    hint = "Scan the warehouse location barcode.",
+                                    scannedValue = locationBarcode.takeIf { it.isNotBlank() },
+                                    onSkip = null,
+                                    onManualEntry = { viewModel.handleBarcodeScan(it) },
+                                    onCameraScan = {
+                                        scannerManager.startCameraScan(context) { barcode ->
+                                            viewModel.handleBarcodeScan(barcode)
                                         }
-                                    )
-                                } else {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Place,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                        Text(
-                                            text = locationBarcode,
-                                            style = MaterialTheme.typography.titleLarge,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
                                     }
-                                }
-
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = "Keep same location for all boxes",
-                                        style = MaterialTheme.typography.bodyMedium
-                                    )
-                                    Switch(
-                                        checked = lockLocation,
-                                        onCheckedChange = viewModel::onLockLocationChanged
-                                    )
-                                }
+                                )
+                                roomBarcode?.let { BarcodeChip(label = "Room", value = it) }
+                                rackBarcode?.let { BarcodeChip(label = "Rack", value = it) }
+                            }
+                            FreshBoxMoveViewModel.STEP_BOXES -> {
+                                LocationSummaryCard(
+                                    roomBarcode = roomBarcode,
+                                    rackBarcode = rackBarcode,
+                                    locationBarcode = locationBarcode,
+                                    lockLocation = lockLocation,
+                                    onLockLocationChanged = viewModel::onLockLocationChanged,
+                                    onChangeLocation = viewModel::resetLocation
+                                )
                             }
                         }
 
-                        if (locationBarcode.isNotBlank()) {
+                        if (step == FreshBoxMoveViewModel.STEP_BOXES && locationBarcode.isNotBlank()) {
                             // Box Scanner Input Section
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -313,7 +278,12 @@ fun FreshBoxMoveScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = if (locationBarcode.isBlank()) "Awaiting Location Scan" else "No boxes scanned yet",
+                                    text = when (step) {
+                                        FreshBoxMoveViewModel.STEP_ROOM -> "Awaiting room scan"
+                                        FreshBoxMoveViewModel.STEP_RACK -> "Awaiting rack scan"
+                                        FreshBoxMoveViewModel.STEP_LOCATION -> "Awaiting location scan"
+                                        else -> "No boxes scanned yet"
+                                    },
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -374,6 +344,178 @@ fun FreshBoxMoveScreen(
                     Text("Cancel")
                 }
             }
+        )
+    }
+}
+
+@Composable
+private fun FreshBoxStepHeader(currentStep: Int) {
+    val steps = listOf("Scan room", "Scan rack", "Scan location", "Scan boxes")
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Fresh Box Intake", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            steps.forEachIndexed { index, label ->
+                val active = index == currentStep
+                val complete = index < currentStep
+                Surface(
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    color = when {
+                        active -> MaterialTheme.colorScheme.primaryContainer
+                        complete -> MaterialTheme.colorScheme.secondaryContainer
+                        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    }
+                ) {
+                    Text(
+                        text = label,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        textAlign = TextAlign.Center,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HierarchyScanCard(
+    title: String,
+    hint: String,
+    scannedValue: String?,
+    onSkip: (() -> Unit)?,
+    onManualEntry: (String) -> Unit,
+    onCameraScan: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(12.dp)
+            ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                if (onSkip != null) {
+                    TextButton(onClick = onSkip) { Text("Skip") }
+                }
+            }
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (scannedValue.isNullOrBlank()) {
+                var input by remember { mutableStateOf("") }
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it },
+                    label = { Text("Scan or enter barcode") },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        Row {
+                            if (input.isNotBlank()) {
+                                IconButton(onClick = {
+                                    onManualEntry(input.trim())
+                                    input = ""
+                                }) {
+                                    Icon(Icons.Default.Check, contentDescription = "Confirm")
+                                }
+                            }
+                            IconButton(onClick = onCameraScan) {
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
+                            }
+                        }
+                    }
+                )
+            } else {
+                BarcodeChip(label = title, value = scannedValue)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationSummaryCard(
+    roomBarcode: String?,
+    rackBarcode: String?,
+    locationBarcode: String,
+    lockLocation: Boolean,
+    onLockLocationChanged: (Boolean) -> Unit,
+    onChangeLocation: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(
+                width = 1.dp,
+                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(12.dp)
+            ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Warehouse Location", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                TextButton(onClick = onChangeLocation) {
+                    Text("Change Location", color = MaterialTheme.colorScheme.error)
+                }
+            }
+            roomBarcode?.let { BarcodeChip(label = "Room", value = it) }
+            rackBarcode?.let { BarcodeChip(label = "Rack", value = it) }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Default.Place, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text(
+                    text = locationBarcode,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Keep same location for all boxes", style = MaterialTheme.typography.bodyMedium)
+                Switch(checked = lockLocation, onCheckedChange = onLockLocationChanged)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BarcodeChip(label: String, value: String) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+    ) {
+        Text(
+            text = "$label: $value",
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold
         )
     }
 }

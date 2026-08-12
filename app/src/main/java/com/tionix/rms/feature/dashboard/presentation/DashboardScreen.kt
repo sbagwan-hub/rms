@@ -1,5 +1,6 @@
 package com.tionix.rms.feature.dashboard.presentation
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -18,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.tionix.rms.feature.dashboard.domain.model.ReportsSummary
 import com.tionix.rms.feature.dashboard.domain.model.Task
 import com.tionix.rms.feature.dashboard.domain.model.TaskPriority
 import com.tionix.rms.feature.dashboard.domain.model.TaskStatus
@@ -32,10 +34,14 @@ private val ErrorRose = Color(0xFFDC2626)
 @Composable
 fun DashboardScreen(
     onTaskClick: (Task) -> Unit,
+    onSearch: () -> Unit = {},
+    onHistory: () -> Unit = {},
+    onProfile: () -> Unit = {},
     onLogout: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val pendingSyncCount by viewModel.pendingSyncCount.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.loggedOut.collect { onLogout() }
@@ -82,6 +88,21 @@ fun DashboardScreen(
                 ) {
                     item {
                         StatsGrid(stats = state.stats)
+                    }
+
+                    if (pendingSyncCount > 0) {
+                        item {
+                            PendingSyncBanner(
+                                count = pendingSyncCount,
+                                onClick = onHistory
+                            )
+                        }
+                    }
+
+                    if (state.canViewReports && state.reportsSummary != null) {
+                        item {
+                            ReportsSummaryCard(summary = state.reportsSummary)
+                        }
                     }
                     
                     item {
@@ -275,6 +296,15 @@ fun DashboardScreen(
                             )
                         }
                     }
+
+                    item {
+                        DashboardFooter(
+                            pendingSyncCount = pendingSyncCount,
+                            onSearch = onSearch,
+                            onHistory = onHistory,
+                            onProfile = onProfile
+                        )
+                    }
                 }
             }
             is DashboardUiState.Error -> {
@@ -309,6 +339,106 @@ fun DashboardScreen(
     }
 
 
+}
+
+@Composable
+private fun PendingSyncBanner(
+    count: Int,
+    onClick: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = WarningAmber.copy(alpha = 0.15f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, WarningAmber.copy(alpha = 0.4f))
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(Icons.Default.Warning, contentDescription = null, tint = WarningAmber)
+            Text(
+                text = "$count operation${if (count == 1) "" else "s"} pending sync",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = WarningAmber
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReportsSummaryCard(summary: ReportsSummary) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Today's summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Today's operations", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(summary.todayOperationsCount.toString(), fontWeight = FontWeight.Bold)
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Missing files", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = summary.missingFilesCount.toString(),
+                    fontWeight = FontWeight.Bold,
+                    color = if (summary.missingFilesCount > 0) ErrorRose else MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DashboardFooter(
+    pendingSyncCount: Int,
+    onSearch: () -> Unit,
+    onHistory: () -> Unit,
+    onProfile: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        OutlinedButton(onClick = onSearch, modifier = Modifier.weight(1f)) {
+            Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+            Text("Search")
+        }
+        BadgedBox(
+            badge = {
+                if (pendingSyncCount > 0) {
+                    Badge { Text(pendingSyncCount.toString()) }
+                }
+            },
+            modifier = Modifier.weight(1f)
+        ) {
+            OutlinedButton(onClick = onHistory, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(4.dp))
+                Text("History")
+            }
+        }
+        OutlinedButton(onClick = onProfile, modifier = Modifier.weight(1f)) {
+            Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+            Text("Profile")
+        }
+    }
 }
 
 @Composable

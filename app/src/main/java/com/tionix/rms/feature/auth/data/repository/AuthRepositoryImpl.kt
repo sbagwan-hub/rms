@@ -33,7 +33,8 @@ class AuthRepositoryImpl @Inject constructor(
                     userId = loginResponse.user.id,
                     fullName = loginResponse.user.fullName,
                     email = loginResponse.user.email,
-                    role = loginResponse.user.role
+                    role = loginResponse.user.role,
+                    permissions = loginResponse.user.permissions.orEmpty().toSet()
                 )
                 
                 AuthResult.Success(

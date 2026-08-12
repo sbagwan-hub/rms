@@ -2,16 +2,22 @@ package com.tionix.rms.feature.dashboard.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tionix.rms.core.sync.data.local.PendingOperationDao
+import com.tionix.rms.feature.auth.data.local.AuthPreferences
 import com.tionix.rms.feature.auth.domain.usecase.LogoutUseCase
 import com.tionix.rms.feature.dashboard.domain.usecase.GetAssignedTasksUseCase
 import com.tionix.rms.feature.dashboard.domain.usecase.GetDashboardStatsUseCase
+import com.tionix.rms.feature.dashboard.domain.usecase.GetReportsSummaryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -19,7 +25,10 @@ import javax.inject.Inject
 class DashboardViewModel @Inject constructor(
     private val getDashboardStatsUseCase: GetDashboardStatsUseCase,
     private val getAssignedTasksUseCase: GetAssignedTasksUseCase,
-    private val logoutUseCase: LogoutUseCase
+    private val getReportsSummaryUseCase: GetReportsSummaryUseCase,
+    private val logoutUseCase: LogoutUseCase,
+    private val authPreferences: AuthPreferences,
+    pendingOperationDao: PendingOperationDao
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<DashboardUiState>(DashboardUiState.Loading)
@@ -28,6 +37,10 @@ class DashboardViewModel @Inject constructor(
     private val _loggedOut = MutableSharedFlow<Unit>()
     val loggedOut: SharedFlow<Unit> = _loggedOut.asSharedFlow()
 
+    val pendingSyncCount: StateFlow<Int> = pendingOperationDao.observePending()
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
     init {
         loadDashboardData()
     }
@@ -35,21 +48,33 @@ class DashboardViewModel @Inject constructor(
     fun loadDashboardData() {
         viewModelScope.launch {
             _uiState.value = DashboardUiState.Loading
-            
+
+            val canViewReports = canViewReports()
             val statsResult = getDashboardStatsUseCase()
             val tasksResult = getAssignedTasksUseCase()
-            
+            val reportsResult = if (canViewReports) getReportsSummaryUseCase() else null
+
             if (statsResult.isSuccess && tasksResult.isSuccess) {
                 _uiState.value = DashboardUiState.Success(
                     stats = statsResult.getOrNull()!!,
-                    tasks = tasksResult.getOrNull() ?: emptyList()
+                    tasks = tasksResult.getOrNull() ?: emptyList(),
+                    reportsSummary = reportsResult?.getOrNull(),
+                    canViewReports = canViewReports
                 )
             } else {
                 _uiState.value = DashboardUiState.Error(
-                    statsResult.exceptionOrNull()?.message ?: tasksResult.exceptionOrNull()?.message ?: "Unknown error"
+                    statsResult.exceptionOrNull()?.message
+                        ?: tasksResult.exceptionOrNull()?.message
+                        ?: "Unknown error"
                 )
             }
         }
+    }
+
+    private suspend fun canViewReports(): Boolean {
+        if (authPreferences.hasPermission("report:view")) return true
+        val role = authPreferences.getRole().orEmpty()
+        return role in MANAGER_ROLES
     }
 
     fun refresh() {
@@ -61,5 +86,13 @@ class DashboardViewModel @Inject constructor(
             logoutUseCase()
             _loggedOut.emit(Unit)
         }
+    }
+
+    companion object {
+        private val MANAGER_ROLES = setOf(
+            "WAREHOUSE_MANAGER",
+            "COMPANY_ADMIN",
+            "SUPER_ADMIN"
+        )
     }
 }

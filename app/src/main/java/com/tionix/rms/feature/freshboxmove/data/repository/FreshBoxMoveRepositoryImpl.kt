@@ -1,21 +1,17 @@
 package com.tionix.rms.feature.freshboxmove.data.repository
 
-import android.content.Context
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.WorkManager
-import com.google.gson.Gson
 import com.tionix.rms.core.network.ErrorUtils
-import com.tionix.rms.core.sync.data.local.SyncOperationDao
-import com.tionix.rms.core.sync.data.local.SyncOperationEntity
+import com.tionix.rms.data.repository.WorkflowRepository
 import com.tionix.rms.feature.auth.data.local.AuthPreferences
 import com.tionix.rms.feature.freshboxmove.data.local.FreshBoxDao
 import com.tionix.rms.feature.freshboxmove.data.local.FreshBoxScanEntity
 import com.tionix.rms.feature.freshboxmove.data.local.FreshBoxSessionEntity
+import com.tionix.rms.feature.freshboxmove.data.remote.FreshBoxApi
+import com.tionix.rms.feature.freshboxmove.data.remote.SubmitScanRequestDto
 import com.tionix.rms.feature.freshboxmove.domain.repository.FreshBoxMoveRepository
-import com.tionix.rms.feature.sync.data.SyncWorker
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.runBlocking
+import retrofit2.HttpException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -25,17 +21,11 @@ import javax.inject.Inject
 
 class FreshBoxMoveRepositoryImpl @Inject constructor(
     private val freshBoxDao: FreshBoxDao,
-    private val syncOperationDao: SyncOperationDao,
+    private val freshBoxApi: FreshBoxApi,
+    private val workflowRepository: WorkflowRepository,
     private val authPreferences: AuthPreferences,
-    @param:ApplicationContext private val context: Context,
 ) : FreshBoxMoveRepository {
 
-    /** Nudge the sync queue right away rather than waiting for the next periodic run. */
-    private fun triggerImmediateSync() {
-        WorkManager.getInstance(context).enqueue(OneTimeWorkRequestBuilder<SyncWorker>().build())
-    }
-
-    private val gson = Gson()
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
         timeZone = TimeZone.getTimeZone("UTC")
     }
@@ -58,23 +48,6 @@ class FreshBoxMoveRepositoryImpl @Inject constructor(
             // 1. Write session to Room
             freshBoxDao.insertSession(sessionEntity)
 
-            // 2. Queue in Pending Sync Queue
-            val syncOperation = SyncOperationEntity(
-                id = UUID.randomUUID().toString(),
-                type = "START_FRESH_BOX_SESSION",
-                endpoint = "workflows/fresh-box-move/sessions",
-                payload = gson.toJson(mapOf(
-                    "clientSessionId" to clientSessionId,
-                    "deviceId" to deviceId
-                )),
-                status = "PENDING",
-                retryCount = 0,
-                createdAt = dateFormat.format(Date(now)),
-                errorMessage = null
-            )
-            syncOperationDao.insert(syncOperation)
-            triggerImmediateSync()
-
             Result.success(sessionEntity)
         } catch (e: Exception) {
             Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
@@ -84,6 +57,8 @@ class FreshBoxMoveRepositoryImpl @Inject constructor(
     override suspend fun submitScan(
         boxBarcode: String,
         locationBarcode: String,
+        roomBarcode: String?,
+        rackBarcode: String?,
         gpsLat: Double?,
         gpsLng: Double?
     ): Result<FreshBoxScanEntity> {
@@ -108,27 +83,46 @@ class FreshBoxMoveRepositoryImpl @Inject constructor(
             // 1. Write scan locally to Room
             freshBoxDao.insertScan(scanEntity)
 
-            // 2. Queue in Pending Sync Queue
-            val syncOperation = SyncOperationEntity(
-                id = UUID.randomUUID().toString(),
-                type = "SUBMIT_FRESH_BOX_SCAN",
-                endpoint = "workflows/fresh-box-move/sessions/{sessionId}/scans",
-                payload = gson.toJson(mapOf(
-                    "clientEventId" to clientEventId,
-                    "clientSessionId" to activeSession.clientSessionId,
-                    "boxBarcode" to boxBarcode,
-                    "locationBarcode" to locationBarcode,
-                    "gpsLat" to gpsLat,
-                    "gpsLng" to gpsLng,
-                    "scannedAt" to dateFormat.format(Date(now))
-                )),
-                status = "PENDING",
-                retryCount = 0,
-                createdAt = dateFormat.format(Date(now)),
-                errorMessage = null
-            )
-            syncOperationDao.insert(syncOperation)
-            triggerImmediateSync()
+            val payload = buildMap<String, Any?> {
+                put("locationBarcode", locationBarcode)
+                put("boxBarcodes", listOf(boxBarcode))
+                put("latitude", gpsLat)
+                put("longitude", gpsLng)
+                put("performedAt", dateFormat.format(Date(now)))
+                roomBarcode?.takeIf { it.isNotBlank() }?.let { put("roomBarcode", it) }
+                rackBarcode?.takeIf { it.isNotBlank() }?.let { put("rackBarcode", it) }
+            }
+
+            val submitResult = workflowRepository.submitOrEnqueue(
+                clientOpId = clientEventId,
+                type = "FRESH_BOX",
+                payload = payload
+            ) {
+                val serverSessionId = activeSession.serverSessionId
+                    ?: throw java.io.IOException("Session not synced yet")
+                val response = freshBoxApi.submitScan(
+                    sessionId = serverSessionId,
+                    request = SubmitScanRequestDto(
+                        locationBarcode = locationBarcode,
+                        boxBarcode = boxBarcode,
+                        clientEventId = clientEventId,
+                        roomBarcode = roomBarcode,
+                        rackBarcode = rackBarcode,
+                        gpsLat = gpsLat,
+                        gpsLng = gpsLng,
+                        scannedAt = dateFormat.format(Date(now))
+                    )
+                )
+                if (!response.isSuccessful) {
+                    throw HttpException(response)
+                }
+                freshBoxDao.markScanAsSynced(clientEventId)
+                response.body()!!
+            }
+
+            if (submitResult.isFailure) {
+                return Result.failure(submitResult.exceptionOrNull()!!)
+            }
 
             Result.success(scanEntity)
         } catch (e: Exception) {
@@ -145,23 +139,6 @@ class FreshBoxMoveRepositoryImpl @Inject constructor(
 
             // 1. End session locally
             freshBoxDao.endSession(activeSession.clientSessionId, now)
-
-            // 2. Queue end session operation
-            val syncOperation = SyncOperationEntity(
-                id = UUID.randomUUID().toString(),
-                type = "END_FRESH_BOX_SESSION",
-                endpoint = "workflows/fresh-box-move/sessions/{sessionId}/end",
-                payload = gson.toJson(mapOf(
-                    "clientSessionId" to activeSession.clientSessionId
-                )),
-                status = "PENDING",
-                retryCount = 0,
-                createdAt = dateFormat.format(Date(now)),
-                errorMessage = null
-            )
-            syncOperationDao.insert(syncOperation)
-            triggerImmediateSync()
-
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))

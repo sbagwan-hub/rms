@@ -6,7 +6,6 @@ import android.os.Vibrator
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tionix.rms.core.audio.BeepPlayer
-import com.tionix.rms.feature.freshboxmove.data.local.FreshBoxScanEntity
 import com.tionix.rms.feature.freshboxmove.data.local.FreshBoxSessionEntity
 import com.tionix.rms.feature.freshboxmove.domain.repository.FreshBoxMoveRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,11 +30,28 @@ class FreshBoxMoveViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context
 ) : ViewModel() {
 
+    companion object {
+        const val STEP_ROOM = 0
+        const val STEP_RACK = 1
+        const val STEP_LOCATION = 2
+        const val STEP_BOXES = 3
+    }
+
     private val _uiState = MutableStateFlow<FreshBoxMoveUiState>(FreshBoxMoveUiState.Idle)
     val uiState: StateFlow<FreshBoxMoveUiState> = _uiState.asStateFlow()
 
     private val _activeSession = MutableStateFlow<FreshBoxSessionEntity?>(null)
     val activeSession: StateFlow<FreshBoxSessionEntity?> = _activeSession.asStateFlow()
+
+    /** 0=room, 1=rack, 2=location, 3=boxes */
+    private val _step = MutableStateFlow(STEP_ROOM)
+    val step: StateFlow<Int> = _step.asStateFlow()
+
+    private val _roomBarcode = MutableStateFlow<String?>(null)
+    val roomBarcode: StateFlow<String?> = _roomBarcode.asStateFlow()
+
+    private val _rackBarcode = MutableStateFlow<String?>(null)
+    val rackBarcode: StateFlow<String?> = _rackBarcode.asStateFlow()
 
     private val _locationBarcode = MutableStateFlow("")
     val locationBarcode: StateFlow<String> = _locationBarcode.asStateFlow()
@@ -46,10 +62,9 @@ class FreshBoxMoveViewModel @Inject constructor(
     private val _duplicateScanWarning = MutableSharedFlow<String>()
     val duplicateScanWarning: SharedFlow<String> = _duplicateScanWarning.asSharedFlow()
 
-    private val _lockLocation = MutableStateFlow(true) // Lock location default ON for continuous scanning
+    private val _lockLocation = MutableStateFlow(true)
     val lockLocation: StateFlow<Boolean> = _lockLocation.asStateFlow()
 
-    // Reactive flow of scanned items in this session
     val scansList = _activeSession.flatMapLatest { session ->
         if (session != null) {
             repository.getScansForSessionFlow(session.clientSessionId)
@@ -67,6 +82,7 @@ class FreshBoxMoveViewModel @Inject constructor(
             val session = repository.getActiveSession()
             if (session != null) {
                 _activeSession.value = session
+                _step.value = STEP_ROOM
                 _uiState.value = FreshBoxMoveUiState.ActiveSession
             } else {
                 _uiState.value = FreshBoxMoveUiState.Idle
@@ -81,9 +97,12 @@ class FreshBoxMoveViewModel @Inject constructor(
             if (result.isSuccess) {
                 val session = result.getOrNull()
                 _activeSession.value = session
+                resetScanContext()
                 _uiState.value = FreshBoxMoveUiState.ActiveSession
             } else {
-                _uiState.value = FreshBoxMoveUiState.Error(result.exceptionOrNull()?.message ?: "Failed to start session")
+                _uiState.value = FreshBoxMoveUiState.Error(
+                    result.exceptionOrNull()?.message ?: "Failed to start session"
+                )
             }
         }
     }
@@ -100,22 +119,39 @@ class FreshBoxMoveViewModel @Inject constructor(
         _lockLocation.value = value
     }
 
-    /**
-     * Handle hardware barcode scan event.
-     */
-     fun handleBarcodeScan(barcode: String) {
+    fun skipStep() {
+        when (_step.value) {
+            STEP_ROOM -> _step.value = STEP_RACK
+            STEP_RACK -> _step.value = STEP_LOCATION
+        }
+    }
+
+    fun handleBarcodeScan(barcode: String) {
         val trimmed = barcode.trim()
         if (trimmed.isEmpty()) return
 
-        // 1. If location is empty or not locked, and barcode starts with location prefix (or we treat it as location scan)
-        if (_locationBarcode.value.isBlank()) {
-            _locationBarcode.value = trimmed
-            beepPlayer.positive()
-            return
-        }
+        if (_activeSession.value == null) return
 
-        // 2. If box barcode is scanned
-        submitScan(trimmed)
+        when (_step.value) {
+            STEP_ROOM -> {
+                _roomBarcode.value = trimmed
+                _step.value = STEP_RACK
+                beepPlayer.positive()
+            }
+            STEP_RACK -> {
+                if (trimmed == _roomBarcode.value) return
+                _rackBarcode.value = trimmed
+                _step.value = STEP_LOCATION
+                beepPlayer.positive()
+            }
+            STEP_LOCATION -> {
+                if (trimmed == _rackBarcode.value || trimmed == _roomBarcode.value) return
+                _locationBarcode.value = trimmed
+                _step.value = STEP_BOXES
+                beepPlayer.positive()
+            }
+            STEP_BOXES -> submitScan(trimmed)
+        }
     }
 
     fun submitScan(boxCode: String) {
@@ -123,6 +159,11 @@ class FreshBoxMoveViewModel @Inject constructor(
             val session = _activeSession.value
             if (session == null) {
                 _uiState.value = FreshBoxMoveUiState.Error("No active session")
+                beepPlayer.error()
+                return@launch
+            }
+
+            if (_step.value != STEP_BOXES) {
                 beepPlayer.error()
                 return@launch
             }
@@ -139,7 +180,6 @@ class FreshBoxMoveViewModel @Inject constructor(
                 return@launch
             }
 
-            // Duplicate Scan Guard
             val currentScans = repository.getScansForSessionFlow(session.clientSessionId).first()
             val isDuplicate = currentScans.any { it.boxBarcode == targetBoxCode }
             if (isDuplicate) {
@@ -152,18 +192,20 @@ class FreshBoxMoveViewModel @Inject constructor(
             val result = repository.submitScan(
                 boxBarcode = targetBoxCode,
                 locationBarcode = locCode,
-                gpsLat = null, // In production, we'd inject GPS
+                roomBarcode = _roomBarcode.value,
+                rackBarcode = _rackBarcode.value,
+                gpsLat = null,
                 gpsLng = null
             )
 
             if (result.isSuccess) {
-                _boxBarcode.value = "" // clear input
+                _boxBarcode.value = ""
                 if (!_lockLocation.value) {
-                    _locationBarcode.value = "" // reset location for next pair if not locked
+                    _locationBarcode.value = ""
+                    _step.value = STEP_LOCATION
                 }
                 _uiState.value = FreshBoxMoveUiState.ActiveSession
-                
-                // Warning beep if more than 9 boxes are moved to the same location
+
                 val boxesAtLocationCount = currentScans.count { it.locationBarcode == locCode }
                 if (boxesAtLocationCount >= 9) {
                     beepPlayer.warning()
@@ -171,12 +213,13 @@ class FreshBoxMoveViewModel @Inject constructor(
                     beepPlayer.positive()
                 }
             } else {
-                _uiState.value = FreshBoxMoveUiState.Error(result.exceptionOrNull()?.message ?: "Failed to submit scan")
+                _uiState.value = FreshBoxMoveUiState.Error(
+                    result.exceptionOrNull()?.message ?: "Failed to submit scan"
+                )
                 beepPlayer.error()
             }
         }
     }
-
 
     private fun triggerDuplicateFeedback() {
         beepPlayer.error()
@@ -189,7 +232,7 @@ class FreshBoxMoveViewModel @Inject constructor(
                     vibrator.vibrate(300)
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Ignore
         }
     }
@@ -200,18 +243,26 @@ class FreshBoxMoveViewModel @Inject constructor(
             val result = repository.endSession()
             if (result.isSuccess) {
                 _activeSession.value = null
-                _locationBarcode.value = ""
-                _boxBarcode.value = ""
+                resetScanContext()
                 _uiState.value = FreshBoxMoveUiState.Idle
             } else {
-                _uiState.value = FreshBoxMoveUiState.Error(result.exceptionOrNull()?.message ?: "Failed to end session")
+                _uiState.value = FreshBoxMoveUiState.Error(
+                    result.exceptionOrNull()?.message ?: "Failed to end session"
+                )
             }
         }
     }
 
     fun resetLocation() {
         _locationBarcode.value = ""
+        _step.value = STEP_LOCATION
+    }
+
+    private fun resetScanContext() {
+        _step.value = STEP_ROOM
+        _roomBarcode.value = null
+        _rackBarcode.value = null
+        _locationBarcode.value = ""
+        _boxBarcode.value = ""
     }
 }
-
-

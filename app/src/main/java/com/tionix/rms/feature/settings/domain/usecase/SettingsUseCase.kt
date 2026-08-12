@@ -7,26 +7,31 @@ import javax.inject.Inject
 class GetSettingsUseCase @Inject constructor(
     private val repository: SettingsRepository
 ) {
-    suspend operator fun invoke(): Result<Settings> {
-        // TODO: BACKEND ENDPOINT PENDING - DataStore only for now
-        return repository.getSettings()
-    }
+    suspend operator fun invoke(): Result<Settings> = repository.getSettings()
 }
 
-class UpdateSettingsUseCase @Inject constructor(
+class UpdateSyncOnCellularUseCase @Inject constructor(
     private val repository: SettingsRepository
 ) {
-    suspend operator fun invoke(settings: Settings): Result<Unit> {
-        // TODO: BACKEND ENDPOINT PENDING - DataStore only for now
-        return repository.updateSettings(settings)
-    }
+    suspend operator fun invoke(enabled: Boolean): Result<Unit> =
+        repository.updateSyncOnCellular(enabled)
+}
+
+class UpdateServerUrlUseCase @Inject constructor(
+    private val repository: SettingsRepository
+) {
+    suspend operator fun invoke(url: String): Result<Unit> =
+        repository.updateServerUrl(url)
+}
+
+class ClearLookupCacheUseCase @Inject constructor(
+    private val repository: SettingsRepository
+) {
+    suspend operator fun invoke(): Result<Unit> = repository.clearLookupCache()
 }
 
 class SyncNowUseCase @Inject constructor(
     private val repository: SettingsRepository
 ) {
-    suspend operator fun invoke(): Result<Unit> {
-        // TODO: BACKEND ENDPOINT PENDING - WorkManager enqueue only for now
-        return repository.syncNow()
-    }
+    suspend operator fun invoke(): Result<Unit> = repository.syncNow()
 }

@@ -26,6 +26,7 @@ class AuthPreferences @Inject constructor(
         private val KEY_FULL_NAME = stringPreferencesKey("full_name")
         private val KEY_EMAIL = stringPreferencesKey("email")
         private val KEY_ROLE = stringPreferencesKey("role")
+        private val KEY_PERMISSIONS = stringSetPreferencesKey("permissions")
         private val KEY_BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
     }
 
@@ -63,6 +64,9 @@ class AuthPreferences @Inject constructor(
     suspend fun getFullName(): String? = dataStore.data.map { it[KEY_FULL_NAME] }.first()
     suspend fun getEmail(): String? = dataStore.data.map { it[KEY_EMAIL] }.first()
     suspend fun getRole(): String? = dataStore.data.map { it[KEY_ROLE] }.first()
+    suspend fun getPermissions(): Set<String> =
+        dataStore.data.map { it[KEY_PERMISSIONS] ?: emptySet() }.first()
+    suspend fun hasPermission(permission: String): Boolean = getPermissions().contains(permission)
     suspend fun isBiometricEnabled(): Boolean = dataStore.data.map { it[KEY_BIOMETRIC_ENABLED] ?: false }.first()
 
     suspend fun saveAuthSession(
@@ -71,7 +75,8 @@ class AuthPreferences @Inject constructor(
         userId: String,
         fullName: String,
         email: String,
-        role: String
+        role: String,
+        permissions: Set<String> = emptySet()
     ) {
         dataStore.edit { preferences ->
             preferences[KEY_ACCESS_TOKEN] = accessToken
@@ -80,6 +85,7 @@ class AuthPreferences @Inject constructor(
             preferences[KEY_FULL_NAME] = fullName
             preferences[KEY_EMAIL] = email
             preferences[KEY_ROLE] = role
+            preferences[KEY_PERMISSIONS] = permissions
         }
     }
 
@@ -117,6 +123,7 @@ class AuthPreferences @Inject constructor(
             preferences.remove(KEY_FULL_NAME)
             preferences.remove(KEY_EMAIL)
             preferences.remove(KEY_ROLE)
+            preferences.remove(KEY_PERMISSIONS)
         }
     }
 }

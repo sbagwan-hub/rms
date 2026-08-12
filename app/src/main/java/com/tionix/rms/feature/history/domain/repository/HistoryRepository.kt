@@ -1,15 +1,11 @@
 package com.tionix.rms.feature.history.domain.repository
 
-import com.tionix.rms.feature.history.domain.model.ActionFilter
-import com.tionix.rms.feature.history.domain.model.DateFilter
-import com.tionix.rms.feature.history.domain.model.HistoryItem
+import com.tionix.rms.feature.history.domain.model.PendingOperationItem
+import com.tionix.rms.feature.history.domain.model.SyncedOperationItem
+import kotlinx.coroutines.flow.Flow
 
 interface HistoryRepository {
-    suspend fun getHistory(
-        actionFilter: ActionFilter,
-        dateFilter: DateFilter,
-        userId: String? = null // If null, get all (for SUPERVISOR/MANAGER)
-    ): Result<List<HistoryItem>>
-    
-    suspend fun retrySync(historyItemId: String): Result<Unit>
+    fun observePendingOperations(): Flow<List<PendingOperationItem>>
+    suspend fun getSyncedOperations(limit: Int = 50): Result<List<SyncedOperationItem>>
+    suspend fun triggerManualSync()
 }

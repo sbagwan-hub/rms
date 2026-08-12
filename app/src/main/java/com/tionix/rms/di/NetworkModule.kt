@@ -1,5 +1,6 @@
 package com.tionix.rms.di
 
+import com.tionix.rms.BuildConfig
 import com.tionix.rms.core.network.ApiService
 import com.tionix.rms.feature.auth.data.local.AuthPreferences
 import com.tionix.rms.feature.auth.data.remote.AuthApiService
@@ -12,6 +13,7 @@ import com.tionix.rms.feature.reports.data.remote.ReportsApiService
 import com.tionix.rms.feature.search.data.remote.SearchApiService
 import com.tionix.rms.feature.segregation.data.remote.SegregationApiService
 import com.tionix.rms.feature.transfer.data.remote.TransferApiService
+import com.google.gson.Gson
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -37,11 +39,16 @@ import javax.inject.Singleton
  * The admin-only surface (`/api/v1/admin/`) is out of scope for this app.
  * 10.0.2.2 is the Android emulator's alias for the host machine's localhost.
  */
-private const val BASE_URL = "http://192.168.1.18:3001/api/v1/mobile/"
+private const val BASE_URL = BuildConfig.API_BASE_URL
+private const val ROOT_BASE_URL = BuildConfig.API_ROOT_URL
 
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
+
+    @Provides
+    @Singleton
+    fun provideGson(): Gson = Gson()
 
     @Provides
     @Singleton
@@ -98,8 +105,23 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    @javax.inject.Named("root")
+    fun provideRootRetrofit(okHttpClient: OkHttpClient): Retrofit =
+        Retrofit.Builder()
+            .baseUrl(ROOT_BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+
+    @Provides
+    @Singleton
     fun provideAuthApiService(retrofit: Retrofit): AuthApiService =
         retrofit.create(AuthApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideDashboardReportsApiService(@javax.inject.Named("root") rootRetrofit: Retrofit): com.tionix.rms.feature.dashboard.data.remote.DashboardReportsApiService =
+        rootRetrofit.create(com.tionix.rms.feature.dashboard.data.remote.DashboardReportsApiService::class.java)
 
     @Provides
     @Singleton
@@ -150,6 +172,16 @@ object NetworkModule {
     @Singleton
     fun provideTransferApiService(retrofit: Retrofit): TransferApiService =
         retrofit.create(TransferApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideOperationsApiService(@javax.inject.Named("root") rootRetrofit: Retrofit): com.tionix.rms.feature.history.data.remote.OperationsApiService =
+        rootRetrofit.create(com.tionix.rms.feature.history.data.remote.OperationsApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideSyncApiService(retrofit: Retrofit): com.tionix.rms.feature.sync.data.remote.SyncApiService =
+        retrofit.create(com.tionix.rms.feature.sync.data.remote.SyncApiService::class.java)
 
     @Provides
     @Singleton

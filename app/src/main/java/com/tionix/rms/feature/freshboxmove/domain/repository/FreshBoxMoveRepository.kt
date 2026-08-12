@@ -16,6 +16,8 @@ interface FreshBoxMoveRepository {
     suspend fun submitScan(
         boxBarcode: String,
         locationBarcode: String,
+        roomBarcode: String? = null,
+        rackBarcode: String? = null,
         gpsLat: Double?,
         gpsLng: Double?
     ): Result<FreshBoxScanEntity>

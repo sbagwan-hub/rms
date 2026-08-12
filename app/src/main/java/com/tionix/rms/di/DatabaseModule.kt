@@ -2,6 +2,8 @@ package com.tionix.rms.di
 
 import android.content.Context
 import androidx.room.Room
+import com.tionix.rms.core.sync.data.local.LookupCacheDao
+import com.tionix.rms.core.sync.data.local.PendingOperationDao
 import com.tionix.rms.core.sync.data.local.SyncDatabase
 import com.tionix.rms.core.sync.data.local.SyncOperationDao
 import dagger.Module
@@ -21,6 +23,16 @@ object DatabaseModule {
         Room.databaseBuilder(context, SyncDatabase::class.java, "rms_sync.db")
             .fallbackToDestructiveMigration()
             .build()
+
+    @Provides
+    @Singleton
+    fun provideLookupCacheDao(database: SyncDatabase): LookupCacheDao =
+        database.lookupCacheDao()
+
+    @Provides
+    @Singleton
+    fun providePendingOperationDao(database: SyncDatabase): PendingOperationDao =
+        database.pendingOperationDao()
 
     @Provides
     @Singleton
