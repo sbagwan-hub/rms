@@ -2,6 +2,7 @@ package com.tionix.rms.feature.profile.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.tionix.rms.feature.auth.domain.repository.AuthRepository
 import com.tionix.rms.feature.profile.domain.usecase.GetPendingSyncCountUseCase
 import com.tionix.rms.feature.profile.domain.usecase.GetProfileUseCase
 import com.tionix.rms.feature.profile.domain.usecase.LogoutUseCase
@@ -18,7 +19,8 @@ class ProfileViewModel @Inject constructor(
     private val getProfileUseCase: GetProfileUseCase,
     private val getPendingSyncCountUseCase: GetPendingSyncCountUseCase,
     private val logoutUseCase: LogoutUseCase,
-    private val syncScheduler: SyncScheduler
+    private val syncScheduler: SyncScheduler,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<ProfileUiState>(ProfileUiState.Loading)
@@ -29,6 +31,9 @@ class ProfileViewModel @Inject constructor(
 
     private val _pendingSyncCount = MutableStateFlow(0)
     val pendingSyncCount: StateFlow<Int> = _pendingSyncCount.asStateFlow()
+
+    private val _switchMessage = MutableStateFlow<String?>(null)
+    val switchMessage: StateFlow<String?> = _switchMessage.asStateFlow()
 
     init {
         refresh()
@@ -47,6 +52,18 @@ class ProfileViewModel @Inject constructor(
                 _uiState.value = ProfileUiState.Error(
                     profileResult.exceptionOrNull()?.message ?: "Failed to load profile"
                 )
+            }
+        }
+    }
+
+    fun switchWarehouse(warehouseId: String) {
+        viewModelScope.launch {
+            _switchMessage.value = null
+            val result = authRepository.switchWarehouse(warehouseId)
+            if (result is com.tionix.rms.feature.auth.domain.model.AuthResult.Success) {
+                refresh()
+            } else if (result is com.tionix.rms.feature.auth.domain.model.AuthResult.Error) {
+                _switchMessage.value = result.message
             }
         }
     }

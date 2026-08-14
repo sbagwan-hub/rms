@@ -251,8 +251,85 @@ class TokenAuthenticator(
                 val data = if (json.has("data")) json.getAsJsonObject("data") else json
                 val newAccessToken = data.get("accessToken")?.asString ?: return null
                 val newRefreshToken = data.get("refreshToken")?.asString
-                preferences.setAccessToken(newAccessToken)
-                if (newRefreshToken != null) preferences.setRefreshToken(newRefreshToken)
+                val expiresAt = data.get("expiresAt")?.asString
+
+                val userObj = data.getAsJsonObject("user")
+                val companyObj = data.getAsJsonObject("company")
+                val branchObj = data.getAsJsonObject("branch")
+                val warehouseObj = data.getAsJsonObject("warehouse")
+                val permissionsArray = data.getAsJsonArray("permissions")
+
+                val fullName = userObj?.get("fullName")?.asString
+                    ?: userObj?.get("name")?.asString
+                    ?: preferences.getFullName().orEmpty()
+                val email = userObj?.get("email")?.asString
+                    ?: userObj?.get("username")?.asString
+                    ?: preferences.getEmail().orEmpty()
+                val role = userObj?.get("role")?.asString ?: preferences.getRole().orEmpty()
+                val userId = userObj?.get("id")?.asString ?: preferences.getUserId().orEmpty()
+
+                val permissions = if (permissionsArray != null) {
+                    permissionsArray.map { it.asString }.toSet()
+                } else {
+                    preferences.getPermissions()
+                }
+
+                val company = companyObj?.let {
+                    com.tionix.rms.feature.auth.domain.model.EntityRef(
+                        it.get("id").asString,
+                        it.get("name").asString,
+                        it.get("code")?.asString
+                    )
+                } ?: preferences.getCompanyId()?.let {
+                    com.tionix.rms.feature.auth.domain.model.EntityRef(
+                        it,
+                        preferences.getCompanyName().orEmpty()
+                    )
+                }
+
+                val branch = branchObj?.let {
+                    com.tionix.rms.feature.auth.domain.model.EntityRef(
+                        it.get("id").asString,
+                        it.get("name").asString,
+                        it.get("code")?.asString
+                    )
+                } ?: preferences.getBranchId()?.let {
+                    com.tionix.rms.feature.auth.domain.model.EntityRef(
+                        it,
+                        preferences.getBranchName().orEmpty()
+                    )
+                }
+
+                val warehouse = warehouseObj?.let {
+                    com.tionix.rms.feature.auth.domain.model.EntityRef(
+                        it.get("id").asString,
+                        it.get("name").asString,
+                        it.get("code")?.asString
+                    )
+                } ?: preferences.getWarehouseId()?.let {
+                    com.tionix.rms.feature.auth.domain.model.EntityRef(
+                        it,
+                        preferences.getWarehouseName().orEmpty(),
+                        preferences.getWarehouseCode()
+                    )
+                }
+
+                preferences.saveSession(
+                    accessToken = newAccessToken,
+                    refreshToken = newRefreshToken ?: preferences.getRefreshToken().orEmpty(),
+                    userId = userId,
+                    fullName = fullName,
+                    email = email,
+                    role = role,
+                    permissions = permissions,
+                    expiresAt = expiresAt,
+                    company = company,
+                    branch = branch,
+                    warehouse = warehouse,
+                    availableWarehouses = preferences.getAvailableWarehouses(),
+                    availableBranches = preferences.getAvailableBranches(),
+                    availableCompanies = preferences.getAvailableCompanies()
+                )
                 newAccessToken
             }
         } catch (e: Exception) {

@@ -6,7 +6,11 @@ import com.tionix.rms.BuildConfig
 import com.tionix.rms.core.sync.data.local.PendingOperationDao
 import com.tionix.rms.feature.auth.data.local.AuthPreferences
 import com.tionix.rms.feature.auth.data.remote.AuthApiService
+import com.tionix.rms.feature.auth.data.remote.dto.LogoutRequestDto
 import com.tionix.rms.feature.auth.data.remote.dto.MeResponseDto
+import com.tionix.rms.feature.auth.data.remote.dto.persistSessionPayload
+import com.tionix.rms.feature.auth.data.remote.dto.toSession
+import com.tionix.rms.feature.auth.domain.model.EntityRef
 import com.tionix.rms.feature.profile.domain.model.UserProfile
 import com.tionix.rms.feature.profile.domain.repository.ProfileRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -27,18 +31,15 @@ class ProfileRepositoryImpl @Inject constructor(
             val response = authApiService.getMe()
             if (response.isSuccessful && response.body() != null) {
                 val me = response.body()!!
-                me.role?.permissions?.let { permissions ->
-                    authPreferences.saveAuthSession(
-                        accessToken = authPreferences.getAccessToken().orEmpty(),
-                        refreshToken = authPreferences.getRefreshToken().orEmpty(),
-                        userId = me.id,
-                        fullName = me.fullName,
-                        email = me.email,
-                        role = me.role.name ?: authPreferences.getRole().orEmpty(),
-                        permissions = permissions.toSet()
-                    )
-                }
-                Result.success(mapProfile(me))
+                val session = me.toSession(
+                    accessToken = authPreferences.getAccessToken().orEmpty(),
+                    refreshToken = authPreferences.getRefreshToken().orEmpty(),
+                    existingWarehouses = authPreferences.getAvailableWarehouses(),
+                    existingBranches = authPreferences.getAvailableBranches(),
+                    existingCompanies = authPreferences.getAvailableCompanies()
+                )
+                authPreferences.persistSessionPayload(session.persistFields())
+                Result.success(mapProfile(me, session.availableWarehouses))
             } else {
                 Result.success(fallbackProfile())
             }
@@ -59,7 +60,7 @@ class ProfileRepositoryImpl @Inject constructor(
         return try {
             val refreshToken = authPreferences.getRefreshToken()
             if (!refreshToken.isNullOrBlank()) {
-                runCatching { authApiService.logout(com.tionix.rms.feature.auth.data.remote.dto.LogoutRequestDto(refreshToken)) }
+                runCatching { authApiService.logout(LogoutRequestDto(refreshToken)) }
             }
             authPreferences.clear()
             Result.success(Unit)
@@ -70,28 +71,47 @@ class ProfileRepositoryImpl @Inject constructor(
     }
 
     private suspend fun fallbackProfile(): UserProfile {
+        val available = authPreferences.getAvailableWarehouses()
+        val warehouseNames = available.map { it.name }.ifEmpty {
+            authPreferences.getWarehouseName()?.let { listOf(it) }.orEmpty()
+        }
         return UserProfile(
             id = authPreferences.getUserId().orEmpty(),
             fullName = authPreferences.getFullName().orEmpty(),
             username = authPreferences.getEmail().orEmpty(),
             role = authPreferences.getRole().orEmpty(),
             roleLabel = formatRole(authPreferences.getRole().orEmpty()),
-            warehouses = emptyList(),
+            warehouses = warehouseNames,
+            companyName = authPreferences.getCompanyName(),
+            branchName = authPreferences.getBranchName(),
+            warehouseName = authPreferences.getWarehouseName(),
+            warehouseCode = authPreferences.getWarehouseCode(),
+            activeWarehouseId = authPreferences.getWarehouseId(),
+            availableWarehouses = available,
             deviceSerial = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID),
             deviceModel = Build.MODEL,
             appVersion = BuildConfig.VERSION_NAME
         )
     }
 
-    private fun mapProfile(me: MeResponseDto): UserProfile {
+    private fun mapProfile(me: MeResponseDto, availableWarehouses: List<EntityRef>): UserProfile {
         val roleName = me.role?.name.orEmpty()
+        val warehouseNames = availableWarehouses.map { it.name }.ifEmpty {
+            me.availableWarehouses?.map { it.name }.orEmpty()
+        }
         return UserProfile(
             id = me.id,
             fullName = me.fullName,
             username = me.employeeCode ?: me.email,
             role = roleName,
             roleLabel = me.role?.label ?: formatRole(roleName),
-            warehouses = me.warehouses.orEmpty(),
+            warehouses = warehouseNames,
+            companyName = me.company?.name,
+            branchName = me.branch?.name,
+            warehouseName = me.warehouse?.name,
+            warehouseCode = me.warehouse?.code,
+            activeWarehouseId = me.warehouse?.id,
+            availableWarehouses = availableWarehouses,
             deviceSerial = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID),
             deviceModel = Build.MODEL,
             appVersion = BuildConfig.VERSION_NAME

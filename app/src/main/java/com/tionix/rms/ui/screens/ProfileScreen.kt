@@ -27,6 +27,7 @@ fun ProfileScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val profile by viewModel.profile.collectAsStateWithLifecycle()
     val pendingSyncCount by viewModel.pendingSyncCount.collectAsStateWithLifecycle()
+    val switchMessage by viewModel.switchMessage.collectAsStateWithLifecycle()
 
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showPendingSyncWarning by remember { mutableStateOf(false) }
@@ -62,6 +63,15 @@ fun ProfileScreen(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        if (switchMessage != null) {
+                            item {
+                                Text(
+                                    switchMessage!!,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
                         item {
                             Card(modifier = Modifier.fillMaxWidth()) {
                                 Column(
@@ -94,8 +104,57 @@ fun ProfileScreen(
                         item {
                             Card(modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Text("Active session", fontWeight = FontWeight.Bold)
+                                    ProfileRow("Company", user.companyName ?: "—")
+                                    ProfileRow("Branch", user.branchName ?: "—")
+                                    ProfileRow("Warehouse", user.warehouseName ?: "—")
+                                    if (!user.warehouseCode.isNullOrBlank()) {
+                                        ProfileRow("Warehouse code", user.warehouseCode)
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Text("Assigned warehouses", fontWeight = FontWeight.Bold)
-                                    if (user.warehouses.isEmpty()) {
+                                    if (user.availableWarehouses.size > 1) {
+                                        var expanded by remember { mutableStateOf(false) }
+                                        val activeLabel = user.availableWarehouses
+                                            .firstOrNull { it.id == user.activeWarehouseId }
+                                            ?.name ?: user.warehouseName ?: "Select warehouse"
+                                        ExposedDropdownMenuBox(
+                                            expanded = expanded,
+                                            onExpandedChange = { expanded = !expanded }
+                                        ) {
+                                            OutlinedTextField(
+                                                value = activeLabel,
+                                                onValueChange = {},
+                                                readOnly = true,
+                                                modifier = Modifier
+                                                    .menuAnchor()
+                                                    .fillMaxWidth(),
+                                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
+                                            )
+                                            ExposedDropdownMenu(
+                                                expanded = expanded,
+                                                onDismissRequest = { expanded = false }
+                                            ) {
+                                                user.availableWarehouses.forEach { warehouse ->
+                                                    DropdownMenuItem(
+                                                        text = { Text(warehouse.name) },
+                                                        onClick = {
+                                                            expanded = false
+                                                            if (warehouse.id != user.activeWarehouseId) {
+                                                                viewModel.switchWarehouse(warehouse.id)
+                                                            }
+                                                        }
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } else if (user.warehouses.isEmpty()) {
                                         Text("No warehouse assignments", color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     } else {
                                         user.warehouses.forEach { Text("• $it") }

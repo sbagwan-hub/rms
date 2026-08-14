@@ -3,7 +3,7 @@ package com.tionix.rms.ui.screens.splash
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tionix.rms.feature.auth.data.local.AuthPreferences
-import com.tionix.rms.feature.auth.data.remote.AuthApiService
+import com.tionix.rms.feature.auth.domain.repository.AuthRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,7 +21,7 @@ sealed class SplashDestination {
 @HiltViewModel
 class SplashViewModel @Inject constructor(
     private val authPreferences: AuthPreferences,
-    private val authApiService: AuthApiService
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _destination = MutableStateFlow<SplashDestination>(SplashDestination.Loading)
@@ -33,24 +33,27 @@ class SplashViewModel @Inject constructor(
 
             val token = authPreferences.getAccessToken()
             val userId = authPreferences.getUserId()
+            val warehouseId = authPreferences.getWarehouseId()
 
             if (token.isNullOrBlank() || userId.isNullOrBlank()) {
                 _destination.value = SplashDestination.Login
                 return@launch
             }
 
-            try {
-                val response = authApiService.getMe()
-                if (response.isSuccessful) {
+            val hydrateResult = authRepository.hydrateSessionFromMe()
+            if (hydrateResult.isSuccess) {
+                val session = hydrateResult.getOrNull()
+                if (session?.warehouse != null) {
                     _destination.value = SplashDestination.Dashboard
-                } else if (response.code() == 401) {
+                } else {
                     authPreferences.clear()
                     _destination.value = SplashDestination.Login
-                } else {
-                    _destination.value = SplashDestination.Dashboard
                 }
-            } catch (_: Exception) {
+            } else if (warehouseId != null) {
                 _destination.value = SplashDestination.Dashboard
+            } else {
+                authPreferences.clear()
+                _destination.value = SplashDestination.Login
             }
         }
     }
