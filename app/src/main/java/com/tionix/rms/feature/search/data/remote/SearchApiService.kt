@@ -19,4 +19,7 @@ interface SearchApiService {
 
     @GET("search/boxes/{id}")
     suspend fun getBoxDetail(@Path("id") boxId: String): Response<BoxDetailDto>
+
+    @GET("search/files/{id}")
+    suspend fun getFileDetail(@Path("id") fileId: String): Response<com.tionix.rms.feature.filesearch.data.remote.dto.FileDetailDto>
 }
