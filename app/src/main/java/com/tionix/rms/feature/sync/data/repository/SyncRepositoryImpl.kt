@@ -13,7 +13,7 @@ import java.util.TimeZone
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 
 private val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
     timeZone = TimeZone.getTimeZone("UTC")
@@ -62,7 +62,16 @@ class SyncRepositoryImpl @Inject constructor(
     }
 
     override fun observePendingSyncQueue(): Flow<PendingSyncQueue> {
-        return flowOf(PendingSyncQueue(emptyList(), emptyList(), 0, 0))
+        return pendingOperationDao.observePending().map { list ->
+            val pending = list.filter { it.state == "QUEUED" || it.state == "SENDING" }.map { it.toDomain() }
+            val failed = list.filter { it.state == "FAILED" }.map { it.toDomain() }
+            PendingSyncQueue(
+                pendingItems = pending,
+                failedItems = failed,
+                pendingCount = pending.size,
+                failedCount = failed.size,
+            )
+        }
     }
 
     override suspend fun retrySyncItem(itemId: String): Result<Unit> {

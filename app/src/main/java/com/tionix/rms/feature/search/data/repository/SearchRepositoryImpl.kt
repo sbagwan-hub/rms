@@ -40,7 +40,15 @@ class SearchRepositoryImpl @Inject constructor(
     }
 
     override suspend fun getBoxDetail(boxId: String): Result<BoxDetail> {
-        // TODO: Add getBoxDetail endpoint to SearchApiService when backend is ready
-        return Result.failure(UnsupportedOperationException("getBoxDetail endpoint not yet available"))
+        return try {
+            val response = apiService.getBoxDetail(boxId)
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!.toDomain())
+            } else {
+                Result.failure(Exception("Failed to load box details"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
+        }
     }
 }
