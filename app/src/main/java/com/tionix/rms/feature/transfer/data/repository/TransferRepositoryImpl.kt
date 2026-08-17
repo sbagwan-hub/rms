@@ -72,10 +72,11 @@ class TransferRepositoryImpl @Inject constructor(
     ): Result<com.tionix.rms.feature.transfer.domain.model.TransferSession> {
         val session = com.tionix.rms.feature.transfer.domain.model.TransferSession(
             id = java.util.UUID.randomUUID().toString(),
-            type = transferType,
-            items = emptyList(),
-            destination = null,
-            status = com.tionix.rms.feature.transfer.domain.model.SessionStatus.SCANNING,
+            sessionId = "TRF-${System.currentTimeMillis()}",
+            transferType = transferType,
+            sourceItems = emptyList(),
+            destination = "",
+            status = com.tionix.rms.feature.transfer.domain.model.SessionStatus.SCANNING_SOURCE,
             startTime = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
                 timeZone = java.util.TimeZone.getTimeZone("UTC")
             }.format(java.util.Date()),
@@ -91,8 +92,9 @@ class TransferRepositoryImpl @Inject constructor(
         val item = com.tionix.rms.feature.transfer.domain.model.TransferItem(
             id = java.util.UUID.randomUUID().toString(),
             barcode = barcode,
-            description = "Box $barcode",
-            currentLocation = "Warehouse Location"
+            name = "Box $barcode",
+            currentLocation = "Warehouse Location",
+            itemType = com.tionix.rms.feature.transfer.domain.model.ItemType.BOX
         )
         return Result.success(item)
     }

@@ -8,6 +8,7 @@ import com.tionix.rms.feature.auth.data.local.AuthPreferences
 import com.tionix.rms.feature.auth.data.remote.AuthApiService
 import com.tionix.rms.feature.auth.data.remote.dto.LogoutRequestDto
 import com.tionix.rms.feature.auth.data.remote.dto.MeResponseDto
+import com.tionix.rms.feature.auth.data.remote.dto.persistFields
 import com.tionix.rms.feature.auth.data.remote.dto.persistSessionPayload
 import com.tionix.rms.feature.auth.data.remote.dto.toSession
 import com.tionix.rms.feature.auth.domain.model.EntityRef

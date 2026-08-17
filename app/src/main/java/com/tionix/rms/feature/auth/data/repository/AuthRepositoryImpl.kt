@@ -9,6 +9,7 @@ import com.tionix.rms.feature.auth.data.remote.dto.LogoutRequestDto
 import com.tionix.rms.feature.auth.data.remote.dto.RefreshRequestDto
 import com.tionix.rms.feature.auth.data.remote.dto.SwitchBranchRequestDto
 import com.tionix.rms.feature.auth.data.remote.dto.SwitchWarehouseRequestDto
+import com.tionix.rms.feature.auth.data.remote.dto.persistFields
 import com.tionix.rms.feature.auth.data.remote.dto.persistSessionPayload
 import com.tionix.rms.feature.auth.data.remote.dto.toDto
 import com.tionix.rms.feature.auth.data.remote.dto.toDomain

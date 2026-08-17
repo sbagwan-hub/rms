@@ -215,7 +215,7 @@ class AuthPreferences @Inject constructor(
     }
 
     private fun writeEntityList(
-        preferences: Preferences.MutablePreferences,
+        preferences: MutablePreferences,
         key: Preferences.Key<String>,
         items: List<EntityRef>
     ) {

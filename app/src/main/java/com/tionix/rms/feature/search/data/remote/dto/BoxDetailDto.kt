@@ -32,9 +32,8 @@ fun BoxDetailDto.toDomain(): BoxDetail = BoxDetail(
     status = when (status.uppercase()) {
         "ACTIVE" -> BoxStatus.ACTIVE
         "ARCHIVED" -> BoxStatus.ARCHIVED
-        "DESTROYED" -> BoxStatus.DESTROYED
+        "LOCKED" -> BoxStatus.LOCKED
         "IN_TRANSIT" -> BoxStatus.IN_TRANSIT
-        "MERGED" -> BoxStatus.MERGED
         else -> BoxStatus.ACTIVE
     },
     fileCount = fileCount,
