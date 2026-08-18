@@ -52,29 +52,39 @@ class RefileRepositoryImpl @Inject constructor(
     }
 
     override suspend fun scanFile(barcode: String): Result<FileRecord> {
-        val location = Location(
-            id = "loc-1",
-            barcode = "LOC-WH1",
-            name = "Warehouse Location",
-            room = "Main Room",
-            rack = "Rack 1",
-            shelf = "Shelf A",
-            type = LocationType.LOCATION
-        )
-        val box = Box(
-            id = "box-1",
-            barcode = "BOX-DEFAULT",
-            description = "Home Box",
-            location = location
-        )
-        val fileRecord = FileRecord(
-            id = barcode,
-            barcode = barcode,
-            title = "File $barcode",
-            currentBox = box,
-            currentLocation = location
-        )
-        return Result.success(fileRecord)
+        return try {
+            val response = apiService.scanFile(barcode)
+            if (response.isSuccessful && response.body() != null) {
+                val dto = response.body()!!
+                val location = Location(
+                    id = dto.id,
+                    barcode = dto.currentLocation,
+                    name = dto.currentLocation,
+                    room = "",
+                    rack = "",
+                    shelf = "",
+                    type = LocationType.LOCATION
+                )
+                val box = Box(
+                    id = dto.id,
+                    barcode = dto.currentLocation,
+                    description = "Box ${dto.currentLocation}",
+                    location = location
+                )
+                val fileRecord = FileRecord(
+                    id = dto.id,
+                    barcode = dto.fileBarcode,
+                    title = dto.fileName ?: "File ${dto.fileBarcode}",
+                    currentBox = box,
+                    currentLocation = location
+                )
+                Result.success(fileRecord)
+            } else {
+                Result.failure(Exception("File $barcode not found"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
+        }
     }
 
     // Refile workflow methods — use-case layer manages local session state
@@ -86,30 +96,47 @@ class RefileRepositoryImpl @Inject constructor(
         fileBarcode: String,
         destinationBoxBarcode: String
     ): Result<RefileAction> {
-        val location = Location(
-            id = "loc-1",
-            barcode = "LOC-WH1",
-            name = "Warehouse Location",
-            room = "Main Room",
-            rack = "Rack 1",
-            shelf = "Shelf A",
-            type = LocationType.LOCATION
-        )
-        val srcBox = Box(id = "src-1", barcode = "BOX-SRC", description = "Source Box", location = location)
-        val dstBox = Box(id = destinationBoxBarcode, barcode = destinationBoxBarcode, description = "Destination Box $destinationBoxBarcode", location = location)
-        val file = FileRecord(id = fileBarcode, barcode = fileBarcode, title = "File $fileBarcode", currentBox = srcBox, currentLocation = location)
-        val action = RefileAction(
-            id = java.util.UUID.randomUUID().toString(),
-            fileRecord = file,
-            sourceBox = srcBox,
-            destinationBox = dstBox,
-            status = RefileActionStatus.CONFIRMED,
-            timestamp = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
-                timeZone = java.util.TimeZone.getTimeZone("UTC")
-            }.format(java.util.Date()),
-            overrideReason = null
-        )
-        return Result.success(action)
+        return try {
+            val startRes = apiService.startRefile(
+                com.tionix.rms.feature.refile.data.remote.dto.StartRefileRequestDto(
+                    fileBarcode = fileBarcode,
+                    newLocation = destinationBoxBarcode,
+                    reason = "Refile"
+                )
+            )
+            if (startRes.isSuccessful && startRes.body() != null) {
+                val dto = startRes.body()!!
+                apiService.completeRefile(dto.id)
+                val location = Location(
+                    id = dto.id,
+                    barcode = destinationBoxBarcode,
+                    name = destinationBoxBarcode,
+                    room = "",
+                    rack = "",
+                    shelf = "",
+                    type = LocationType.LOCATION
+                )
+                val srcBox = Box(id = dto.id, barcode = dto.currentLocation, description = "Source Box", location = location)
+                val dstBox = Box(id = destinationBoxBarcode, barcode = destinationBoxBarcode, description = "Destination Box $destinationBoxBarcode", location = location)
+                val file = FileRecord(id = dto.id, barcode = fileBarcode, title = dto.fileName ?: "File $fileBarcode", currentBox = srcBox, currentLocation = location)
+                val action = RefileAction(
+                    id = dto.id,
+                    fileRecord = file,
+                    sourceBox = srcBox,
+                    destinationBox = dstBox,
+                    status = RefileActionStatus.CONFIRMED,
+                    timestamp = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+                        timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    }.format(java.util.Date()),
+                    overrideReason = null
+                )
+                Result.success(action)
+            } else {
+                Result.failure(Exception("Failed to confirm refile on server"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
+        }
     }
 
     override suspend fun overrideMismatch(
@@ -117,30 +144,47 @@ class RefileRepositoryImpl @Inject constructor(
         destinationBoxBarcode: String,
         reason: String
     ): Result<RefileAction> {
-        val location = Location(
-            id = "loc-1",
-            barcode = "LOC-WH1",
-            name = "Warehouse Location",
-            room = "Main Room",
-            rack = "Rack 1",
-            shelf = "Shelf A",
-            type = LocationType.LOCATION
-        )
-        val srcBox = Box(id = "src-1", barcode = "BOX-SRC", description = "Source Box", location = location)
-        val dstBox = Box(id = destinationBoxBarcode, barcode = destinationBoxBarcode, description = "Destination Box $destinationBoxBarcode", location = location)
-        val file = FileRecord(id = fileBarcode, barcode = fileBarcode, title = "File $fileBarcode", currentBox = srcBox, currentLocation = location)
-        val action = RefileAction(
-            id = java.util.UUID.randomUUID().toString(),
-            fileRecord = file,
-            sourceBox = srcBox,
-            destinationBox = dstBox,
-            status = RefileActionStatus.OVERRIDDEN,
-            timestamp = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
-                timeZone = java.util.TimeZone.getTimeZone("UTC")
-            }.format(java.util.Date()),
-            overrideReason = reason
-        )
-        return Result.success(action)
+        return try {
+            val startRes = apiService.startRefile(
+                com.tionix.rms.feature.refile.data.remote.dto.StartRefileRequestDto(
+                    fileBarcode = fileBarcode,
+                    newLocation = destinationBoxBarcode,
+                    reason = reason
+                )
+            )
+            if (startRes.isSuccessful && startRes.body() != null) {
+                val dto = startRes.body()!!
+                apiService.completeRefile(dto.id)
+                val location = Location(
+                    id = dto.id,
+                    barcode = destinationBoxBarcode,
+                    name = destinationBoxBarcode,
+                    room = "",
+                    rack = "",
+                    shelf = "",
+                    type = LocationType.LOCATION
+                )
+                val srcBox = Box(id = dto.id, barcode = dto.currentLocation, description = "Source Box", location = location)
+                val dstBox = Box(id = destinationBoxBarcode, barcode = destinationBoxBarcode, description = "Destination Box $destinationBoxBarcode", location = location)
+                val file = FileRecord(id = dto.id, barcode = fileBarcode, title = dto.fileName ?: "File $fileBarcode", currentBox = srcBox, currentLocation = location)
+                val action = RefileAction(
+                    id = dto.id,
+                    fileRecord = file,
+                    sourceBox = srcBox,
+                    destinationBox = dstBox,
+                    status = RefileActionStatus.OVERRIDDEN,
+                    timestamp = java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", java.util.Locale.US).apply {
+                        timeZone = java.util.TimeZone.getTimeZone("UTC")
+                    }.format(java.util.Date()),
+                    overrideReason = reason
+                )
+                Result.success(action)
+            } else {
+                Result.failure(Exception("Failed to override refile on server"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
+        }
     }
 
     override suspend fun startSession(): Result<RefileSession> {

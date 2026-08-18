@@ -185,7 +185,7 @@ class LoginViewModel @Inject constructor(
                     password = _password.value,
                     device = DeviceInfo(
                         serialNumber = deviceId,
-                        model = "Android Emulator",
+                        model = "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}".trim(),
                         appVersion = "1.0.0"
                     )
                 )
