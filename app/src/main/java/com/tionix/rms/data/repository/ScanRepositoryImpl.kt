@@ -15,7 +15,7 @@ class ScanRepositoryImpl @Inject constructor(
 ) : ScanRepository {
 
     override suspend fun lookup(barcode: String): Result<LookupData> {
-        val code = barcode.trim()
+        val code = barcode.trim().uppercase()
         return try {
             val response = apiService.lookup(code)
             val body = response.body()

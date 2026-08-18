@@ -138,26 +138,5 @@ class ScanViewModel @Inject constructor(
                 history = (listOf(code) + it.history).take(20),
             )
         }
-
-        viewModelScope.launch {
-            // 1) What is it + what's inside?
-            scanRepository.lookup(code)
-                .onSuccess { data -> _state.update { it.copy(loading = false, result = data) } }
-                .onFailure { e ->
-                    _state.update { it.copy(loading = false, result = null, error = e.message) }
-                    return@launch // unknown barcode → nothing to record
-                }
-
-            // 2) Persist the scan (fire-and-report). GPS is stamped by the
-            //    backend Operation; coordinates wired in the GPS module.
-            scanRepository.record(code, lat = null, lng = null)
-                .onSuccess { _state.update { it.copy(recorded = true) } }
-                .onFailure { e ->
-                    // Lookup succeeded but persistence failed (e.g. network blip):
-                    // surface it — the offline queue (Module 10) will remove
-                    // this failure mode entirely by queueing locally.
-                    _state.update { it.copy(error = "Saved locally failed: ${e.message}") }
-                }
-        }
     }
 }

@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "RMS"
 include(":app")
+include(":scanfeature")

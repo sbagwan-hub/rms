@@ -1,0 +1,9 @@
+com.tionix.rms.scanfeature-pngs-0 /Users/avinashmagar/AndroidStudioProjects/rms/RMS/scanfeature/build/generated/res/pngs/debug
+com.tionix.rms.scanfeature-updated_navigation_xml-1 /Users/avinashmagar/AndroidStudioProjects/rms/RMS/scanfeature/build/generated/updated_navigation_xml/debug
+com.tionix.rms.scanfeature-mergeDebugResources-2 /Users/avinashmagar/AndroidStudioProjects/rms/RMS/scanfeature/build/intermediates/incremental/debug/mergeDebugResources/merged.dir
+com.tionix.rms.scanfeature-mergeDebugResources-3 /Users/avinashmagar/AndroidStudioProjects/rms/RMS/scanfeature/build/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+com.tionix.rms.scanfeature-debug-4 /Users/avinashmagar/AndroidStudioProjects/rms/RMS/scanfeature/build/intermediates/merged_res/debug/mergeDebugResources
+com.tionix.rms.scanfeature-debug-5 /Users/avinashmagar/AndroidStudioProjects/rms/RMS/scanfeature/build/intermediates/packaged_res/debug/packageDebugResources
+com.tionix.rms.scanfeature-debug-6 /Users/avinashmagar/AndroidStudioProjects/rms/RMS/scanfeature/src/debug/res
+com.tionix.rms.scanfeature-main-7 /Users/avinashmagar/AndroidStudioProjects/rms/RMS/scanfeature/src/main/res
+gradleHome-0 /Users/avinashmagar/.gradle
