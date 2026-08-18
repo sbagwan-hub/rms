@@ -30,15 +30,148 @@ fun BoxDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val boxDetail by viewModel.boxDetail.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    var showInsertDialog by remember { mutableStateOf(false) }
+    var inputBarcode by remember { mutableStateOf("") }
+    var insertStatusMessage by remember { mutableStateOf<String?>(null) }
+    var isInserting by remember { mutableStateOf(false) }
 
     LaunchedEffect(boxId) {
         viewModel.getBoxDetail(boxId)
     }
 
-    DisposableEffect(Unit) {
+    LaunchedEffect(showInsertDialog) {
+        if (showInsertDialog) {
+            viewModel.scannerRepository.scanResults.collect { scanResult ->
+                if (scanResult.barcode.isNotBlank()) {
+                    inputBarcode = scanResult.barcode.trim().uppercase()
+                }
+            }
+        }
+    }
+
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> viewModel.scannerRepository.enableScanner()
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> viewModel.scannerRepository.disableScanner()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.scannerRepository.disableScanner()
             viewModel.clearBoxDetail()
         }
+    }
+
+    if (showInsertDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!isInserting) {
+                    showInsertDialog = false
+                    inputBarcode = ""
+                    insertStatusMessage = null
+                }
+            },
+            title = { Text("Insert File into Box") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "Point Honeywell scanner at File barcode (e.g. MAC5832438) or tap Scan below:",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Button(
+                        onClick = { viewModel.scannerRepository.startCameraScan(context) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Scan File")
+                    }
+
+                    if (inputBarcode.isNotBlank()) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("Scanned File:", style = MaterialTheme.typography.labelSmall)
+                                Text(
+                                    inputBarcode,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    if (insertStatusMessage != null) {
+                        Text(
+                            text = insertStatusMessage!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val cleanCode = inputBarcode.trim().uppercase()
+                        if (cleanCode.isNotBlank()) {
+                            isInserting = true
+                            insertStatusMessage = null
+                            viewModel.insertFile(
+                                boxId = boxId,
+                                fileBarcode = cleanCode,
+                                title = null
+                            ) { success, msg ->
+                                isInserting = false
+                                if (success) {
+                                    showInsertDialog = false
+                                    inputBarcode = ""
+                                    insertStatusMessage = null
+                                } else {
+                                    insertStatusMessage = msg
+                                }
+                            }
+                        }
+                    },
+                    enabled = inputBarcode.isNotBlank() && !isInserting
+                ) {
+                    if (isInserting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Text("Confirm Insert")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showInsertDialog = false
+                        inputBarcode = ""
+                        insertStatusMessage = null
+                    },
+                    enabled = !isInserting
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -107,109 +240,152 @@ fun BoxDetailScreen(
                             }
                         }
                         
-                        // Role-gated actions
-                        if (canTransfer || canRefile) {
-                            item {
-                                Text(
-                                    text = "Quick Actions",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            
-                            if (canTransfer) {
-                                item {
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        onClick = { onNavigateToTransfer(detail.id) }
+                        // Quick actions
+                        item {
+                            Text(
+                                text = "Quick Actions",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        // Insert File Action (always available)
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { showInsertDialog = true }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Surface(
+                                        shape = MaterialTheme.shapes.small,
+                                        color = MaterialTheme.colorScheme.tertiaryContainer
                                     ) {
-                                        Row(
-                                            modifier = Modifier.padding(16.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Surface(
-                                                shape = MaterialTheme.shapes.small,
-                                                color = MaterialTheme.colorScheme.primaryContainer
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.SwapHoriz,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.padding(12.dp)
-                                                )
-                                            }
-                                            
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = "Transfer Box",
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Text(
-                                                    text = "Move this box to another location",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                            
-                                            Icon(
-                                                Icons.Default.ChevronRight,
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
+                                        Icon(
+                                            Icons.Default.NoteAdd,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.tertiary,
+                                            modifier = Modifier.padding(12.dp)
+                                        )
                                     }
+
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Insert File",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Scan or enter file barcode to attach to this box",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    Icon(
+                                        Icons.Default.ChevronRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
-                            
-                            if (canRefile) {
-                                item {
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        onClick = { onNavigateToRefile(detail.id) }
+                        }
+
+                        if (canTransfer) {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = { onNavigateToTransfer(detail.id) }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(
-                                            modifier = Modifier.padding(16.dp),
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                        Surface(
+                                            shape = MaterialTheme.shapes.small,
+                                            color = MaterialTheme.colorScheme.primaryContainer
                                         ) {
-                                            Surface(
-                                                shape = MaterialTheme.shapes.small,
-                                                color = MaterialTheme.colorScheme.secondaryContainer
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.FileUpload,
-                                                    contentDescription = null,
-                                                    tint = MaterialTheme.colorScheme.secondary,
-                                                    modifier = Modifier.padding(12.dp)
-                                                )
-                                            }
-                                            
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = "Refile Files",
-                                                    style = MaterialTheme.typography.titleMedium,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Text(
-                                                    text = "Refile files from this box",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
-                                            
                                             Icon(
-                                                Icons.Default.ChevronRight,
+                                                Icons.Default.SwapHoriz,
                                                 contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(12.dp)
                                             )
                                         }
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Transfer Box",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = "Move this box to another location",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+
+                                        Icon(
+                                            Icons.Default.ChevronRight,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
                                     }
                                 }
                             }
                         }
-                        
+
+                        if (canRefile) {
+                            item {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = { onNavigateToRefile(detail.id) }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(16.dp),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Surface(
+                                            shape = MaterialTheme.shapes.small,
+                                            color = MaterialTheme.colorScheme.secondaryContainer
+                                        ) {
+                                            Icon(
+                                                Icons.Default.FileUpload,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.secondary,
+                                                modifier = Modifier.padding(12.dp)
+                                            )
+                                        }
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "Refile Files",
+                                                style = MaterialTheme.typography.titleMedium,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = "Refile files from this box",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+
+                                        Icon(
+                                            Icons.Default.ChevronRight,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                         // Contents list
                         item {
                             Text(

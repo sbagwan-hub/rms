@@ -84,7 +84,15 @@ fun RmsNavGraph() {
             modifier = Modifier.padding(paddingValues)
         ) {
             composable(RmsRoutes.SCAN) {
-                ScanScreen(onBack = { navController.popBackStack() })
+                ScanScreen(
+                    onBack = { navController.popBackStack() },
+                    onNavigateToBoxDetail = { boxId ->
+                        navController.navigate(RmsRoutes.boxDetail(boxId))
+                    },
+                    onNavigateToFileDetail = { fileId ->
+                        navController.navigate(RmsRoutes.fileDetail(fileId))
+                    }
+                )
             }
 
             composable(RmsRoutes.SPLASH) {

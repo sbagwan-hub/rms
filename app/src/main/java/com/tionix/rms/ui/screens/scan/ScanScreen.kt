@@ -63,6 +63,8 @@ import com.tionix.rms.scanner.ScannerAvailability
 @Composable
 fun ScanScreen(
     onBack: () -> Unit,
+    onNavigateToBoxDetail: (String) -> Unit = {},
+    onNavigateToFileDetail: (String) -> Unit = {},
     viewModel: ScanViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -126,21 +128,6 @@ fun ScanScreen(
                 )
             }
 
-            // Manual entry (fallback for damaged barcodes)
-            var manual by remember { mutableStateOf("") }
-            OutlinedTextField(
-                value = manual,
-                onValueChange = { manual = it },
-                label = { Text("…or type barcode manually") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = {
-                    viewModel.onBarcode(manual)
-                    manual = ""
-                }),
-                modifier = Modifier.fillMaxWidth(),
-            )
-
             // Thin progress bar while lookup + record are in flight
             if (state.loading) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
 
@@ -169,8 +156,22 @@ fun ScanScreen(
 
             // Lookup result — entity header + its CONTENTS
             state.result?.let { result ->
-                EntityHeader(result, recorded = state.recorded)
-                ContentsList(result)
+                EntityHeader(
+                    result = result,
+                    recorded = state.recorded,
+                    onOpenBoxDetail = { onNavigateToBoxDetail(result.entity.barcode) },
+                    onOpenFileDetail = { onNavigateToFileDetail(result.entity.barcode) }
+                )
+                ContentsList(
+                    result = result,
+                    onSelectContent = { item ->
+                        if (result.entityType == "BOX") {
+                            onNavigateToFileDetail(item.barcode)
+                        } else if (result.entityType == "LOCATION") {
+                            onNavigateToBoxDetail(item.barcode)
+                        }
+                    }
+                )
             }
         }
     }
@@ -178,9 +179,14 @@ fun ScanScreen(
 
 /** Card describing WHAT was scanned + WHERE it lives + recording status. */
 @Composable
-private fun EntityHeader(result: LookupData, recorded: Boolean) {
+private fun EntityHeader(
+    result: LookupData,
+    recorded: Boolean,
+    onOpenBoxDetail: () -> Unit = {},
+    onOpenFileDetail: () -> Unit = {}
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
 
             // Breadcrumb: Company › Branch › WH › Site › Room › Rack › Shelf › Location
             if (result.path.isNotEmpty()) {
@@ -241,13 +247,38 @@ private fun EntityHeader(result: LookupData, recorded: Boolean) {
                     },
                 )
             }
+
+            // Action Buttons for Scanned Entity
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (result.entityType == "BOX") {
+                    Button(
+                        onClick = onOpenBoxDetail,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("View Box Details & Actions")
+                    }
+                } else if (result.entityType == "FILE") {
+                    Button(
+                        onClick = onOpenFileDetail,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("View File Details")
+                    }
+                }
+            }
         }
     }
 }
 
 /** CONTENTS — the "what's inside" answer */
 @Composable
-private fun ContentsList(result: LookupData) {
+private fun ContentsList(
+    result: LookupData,
+    onSelectContent: (com.tionix.rms.core.network.dto.ContentItem) -> Unit = {}
+) {
     val title = when (result.entityType) {
         "LOCATION" -> "Boxes at this location (${result.contents.size})"
         "BOX" -> "Files in this box (${result.contents.size})"
@@ -266,23 +297,28 @@ private fun ContentsList(result: LookupData) {
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         items(result.contents, key = { it.id }) { item ->
-            ListItem(
-                headlineContent = {
-                    Text(item.barcode, fontFamily = FontFamily.Monospace)
-                },
-                supportingContent = {
-                    Text(listOfNotNull(item.label, item.status).joinToString(" · "))
-                },
-                trailingContent = {
-                    item.fileCount?.let { Text("$it files", style = MaterialTheme.typography.labelMedium) }
-                },
-                leadingContent = {
-                    Icon(
-                        if (result.entityType == "LOCATION") Icons.Filled.Inventory2 else Icons.Filled.Folder,
-                        contentDescription = null,
-                    )
-                },
-            )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = { onSelectContent(item) }
+            ) {
+                ListItem(
+                    headlineContent = {
+                        Text(item.barcode, fontFamily = FontFamily.Monospace)
+                    },
+                    supportingContent = {
+                        Text(listOfNotNull(item.label, item.status).joinToString(" · "))
+                    },
+                    trailingContent = {
+                        item.fileCount?.let { Text("$it files", style = MaterialTheme.typography.labelMedium) }
+                    },
+                    leadingContent = {
+                        Icon(
+                            if (result.entityType == "LOCATION") Icons.Filled.Inventory2 else Icons.Filled.Folder,
+                            contentDescription = null,
+                        )
+                    },
+                )
+            }
         }
     }
 }

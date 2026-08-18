@@ -22,4 +22,29 @@ interface SearchApiService {
 
     @GET("search/files/{id}")
     suspend fun getFileDetail(@Path("id") fileId: String): Response<com.tionix.rms.feature.filesearch.data.remote.dto.FileDetailDto>
+
+    @retrofit2.http.POST("search/boxes/{id}/files")
+    suspend fun insertFile(
+        @Path("id") boxId: String,
+        @retrofit2.http.Body request: InsertFileRequest
+    ): Response<InsertFileResponse>
 }
+
+data class InsertFileRequest(
+    val fileBarcode: String,
+    val title: String? = null
+)
+
+data class InsertFileResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val data: InsertFileData? = null
+)
+
+data class InsertFileData(
+    val id: String,
+    val barcode: String,
+    val title: String,
+    val boxId: String,
+    val boxBarcode: String
+)

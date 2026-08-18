@@ -22,7 +22,12 @@ class SearchByBarcodeUseCase @Inject constructor(private val repository: SearchR
 
 class GetBoxDetailUseCase @Inject constructor(private val repository: SearchRepository) {
     suspend operator fun invoke(boxId: String): Result<BoxDetail> {
-        // TODO: BACKEND ENDPOINT PENDING
         return repository.getBoxDetail(boxId)
+    }
+}
+
+class InsertFileUseCase @Inject constructor(private val repository: SearchRepository) {
+    suspend operator fun invoke(boxId: String, fileBarcode: String, title: String? = null): Result<String> {
+        return repository.insertFile(boxId, fileBarcode, title)
     }
 }

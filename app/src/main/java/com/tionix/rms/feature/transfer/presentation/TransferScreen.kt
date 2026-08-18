@@ -152,30 +152,19 @@ fun TransferScreen(
                                     color = MaterialTheme.colorScheme.primary
                                 )
                                 
-                                OutlinedTextField(
-                                    value = scannedBarcode,
-                                    onValueChange = viewModel::onScannedBarcodeChanged,
-                                    label = { Text("Barcode") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    trailingIcon = {
-                                        IconButton(onClick = {
-                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
-                                                viewModel.onScannedBarcodeChanged(barcode)
-                                                viewModel.addItem(barcode)
-                                            }
-                                        }) {
-                                            Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
-                                        }
-                                    }
-                                )
-                                
                                 Button(
-                                    onClick = { viewModel.addItem(scannedBarcode) },
+                                    onClick = {
+                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                            val clean = barcode.trim().uppercase()
+                                            viewModel.onScannedBarcodeChanged(clean)
+                                            viewModel.addItem(clean)
+                                        }
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Icon(Icons.Default.Add, contentDescription = null)
+                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Add Item")
+                                    Text("Scan Item")
                                 }
                             }
                         }
@@ -227,26 +216,25 @@ fun TransferScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 
-                                OutlinedTextField(
-                                    value = destination,
-                                    onValueChange = viewModel::onDestinationChanged,
-                                    label = { Text("Destination Barcode") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    trailingIcon = {
-                                        IconButton(onClick = {
-                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
-                                                viewModel.onDestinationChanged(barcode)
-                                                viewModel.setDestination(barcode)
-                                            }
-                                        }) {
-                                            Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
+                                Button(
+                                    onClick = {
+                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                            val clean = barcode.trim().uppercase()
+                                            viewModel.onDestinationChanged(clean)
+                                            viewModel.setDestination(clean)
                                         }
-                                    }
-                                )
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(if (destination.isBlank()) "Scan Destination Barcode" else "Destination: $destination (Rescan)")
+                                }
                                 
                                 Button(
                                     onClick = { viewModel.setDestination(destination) },
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth(),
+                                    enabled = destination.isNotBlank()
                                 ) {
                                     Icon(Icons.Default.Check, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))

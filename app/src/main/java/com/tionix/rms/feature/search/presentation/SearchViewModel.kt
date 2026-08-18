@@ -28,6 +28,7 @@ class SearchViewModel @Inject constructor(
     private val searchUseCase: SearchUseCase,
     private val searchByBarcodeUseCase: SearchByBarcodeUseCase,
     private val getBoxDetailUseCase: GetBoxDetailUseCase,
+    private val insertFileUseCase: com.tionix.rms.feature.search.domain.usecase.InsertFileUseCase,
     val scannerRepository: ScannerRepository,
     private val initializeScannerUseCase: InitializeScannerUseCase,
     private val startScanningUseCase: StartScanningUseCase,
@@ -145,6 +146,30 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch {
             stopScanningUseCase()
         }
+    }
+
+    private val _insertMessage = MutableStateFlow<String?>(null)
+    val insertMessage: StateFlow<String?> = _insertMessage.asStateFlow()
+
+    fun insertFile(boxId: String, fileBarcode: String, title: String? = null, onComplete: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            val result = insertFileUseCase(boxId, fileBarcode, title)
+            if (result.isSuccess) {
+                val msg = result.getOrNull() ?: "File inserted successfully"
+                _insertMessage.value = msg
+                // Refresh box details to show updated contents
+                getBoxDetail(boxId)
+                onComplete(true, msg)
+            } else {
+                val err = result.exceptionOrNull()?.message ?: "Failed to insert file"
+                _insertMessage.value = err
+                onComplete(false, err)
+            }
+        }
+    }
+
+    fun clearInsertMessage() {
+        _insertMessage.value = null
     }
 
     fun clearBoxDetail() {

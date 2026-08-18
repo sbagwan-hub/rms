@@ -417,28 +417,14 @@ private fun HierarchyScanCard(
             }
             Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (scannedValue.isNullOrBlank()) {
-                var input by remember { mutableStateOf("") }
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = { input = it },
-                    label = { Text("Scan or enter barcode") },
-                    modifier = Modifier.fillMaxWidth(),
-                    trailingIcon = {
-                        Row {
-                            if (input.isNotBlank()) {
-                                IconButton(onClick = {
-                                    onManualEntry(input.trim())
-                                    input = ""
-                                }) {
-                                    Icon(Icons.Default.Check, contentDescription = "Confirm")
-                                }
-                            }
-                            IconButton(onClick = onCameraScan) {
-                                Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
-                            }
-                        }
-                    }
-                )
+                Button(
+                    onClick = onCameraScan,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Scan $title")
+                }
             } else {
                 BarcodeChip(label = title, value = scannedValue)
             }

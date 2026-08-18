@@ -154,25 +154,14 @@ fun SegregationScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 
-                                OutlinedTextField(
-                                    value = scannedBarcode,
-                                    onValueChange = viewModel::onScannedBarcodeChanged,
-                                    label = { Text("Source Box Barcode") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    trailingIcon = {
-                                        IconButton(onClick = {
-                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
-                                                viewModel.onScannedBarcodeChanged(barcode)
-                                                viewModel.scanSourceBox(barcode)
-                                            }
-                                        }) {
-                                            Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
-                                        }
-                                    }
-                                )
-                                
                                 Button(
-                                    onClick = { viewModel.scanSourceBox(scannedBarcode) },
+                                    onClick = {
+                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                            val clean = barcode.trim().uppercase()
+                                            viewModel.onScannedBarcodeChanged(clean)
+                                            viewModel.scanSourceBox(clean)
+                                        }
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Icon(Icons.Default.QrCodeScanner, contentDescription = null)
@@ -206,25 +195,14 @@ fun SegregationScreen(
                                     )
                                 }
                                 
-                                OutlinedTextField(
-                                    value = scannedBarcode,
-                                    onValueChange = viewModel::onScannedBarcodeChanged,
-                                    label = { Text("Target Box Barcode") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    trailingIcon = {
-                                        IconButton(onClick = {
-                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
-                                                viewModel.onScannedBarcodeChanged(barcode)
-                                                viewModel.scanTargetBox(barcode)
-                                            }
-                                        }) {
-                                            Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
-                                        }
-                                    }
-                                )
-                                
                                 Button(
-                                    onClick = { viewModel.scanTargetBox(scannedBarcode) },
+                                    onClick = {
+                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                            val clean = barcode.trim().uppercase()
+                                            viewModel.onScannedBarcodeChanged(clean)
+                                            viewModel.scanTargetBox(clean)
+                                        }
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Icon(Icons.Default.QrCodeScanner, contentDescription = null)
@@ -260,7 +238,7 @@ fun SegregationScreen(
                                 verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 Text(
-                                    text = "Move Files",
+                                    text = "Scan Files to Move",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -281,30 +259,19 @@ fun SegregationScreen(
                                     )
                                 }
                                 
-                                OutlinedTextField(
-                                    value = scannedBarcode,
-                                    onValueChange = viewModel::onScannedBarcodeChanged,
-                                    label = { Text("File Barcode") },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    trailingIcon = {
-                                        IconButton(onClick = {
-                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
-                                                viewModel.onScannedBarcodeChanged(barcode)
-                                                viewModel.moveFile(barcode)
-                                            }
-                                        }) {
-                                            Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
-                                        }
-                                    }
-                                )
-                                
                                 Button(
-                                    onClick = { viewModel.moveFile(scannedBarcode) },
+                                    onClick = {
+                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                            val clean = barcode.trim().uppercase()
+                                            viewModel.onScannedBarcodeChanged(clean)
+                                            viewModel.moveFile(clean)
+                                        }
+                                    },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Move File")
+                                    Text("Scan File to Move")
                                 }
                             }
                         }

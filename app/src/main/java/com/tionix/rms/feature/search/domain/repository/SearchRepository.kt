@@ -7,6 +7,7 @@ interface SearchRepository {
     suspend fun search(query: String, type: SearchType): Result<List<SearchResult>>
     suspend fun searchByBarcode(barcode: String): Result<SearchResult?>
     suspend fun getBoxDetail(boxId: String): Result<BoxDetail>
+    suspend fun insertFile(boxId: String, fileBarcode: String, title: String? = null): Result<String>
 }
 
 enum class SearchType {

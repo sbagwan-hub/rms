@@ -51,4 +51,23 @@ class SearchRepositoryImpl @Inject constructor(
             Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
+
+    override suspend fun insertFile(boxId: String, fileBarcode: String, title: String?): Result<String> {
+        return try {
+            val response = apiService.insertFile(
+                boxId = boxId,
+                request = com.tionix.rms.feature.search.data.remote.InsertFileRequest(
+                    fileBarcode = fileBarcode,
+                    title = title
+                )
+            )
+            if (response.isSuccessful && response.body()?.success == true) {
+                Result.success(response.body()?.message ?: "File inserted successfully")
+            } else {
+                Result.failure(Exception(response.body()?.message ?: "Failed to insert file"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
+        }
+    }
 }

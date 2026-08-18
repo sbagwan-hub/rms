@@ -131,25 +131,14 @@ fun MergeScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             
-                            OutlinedTextField(
-                                value = scannedBarcode,
-                                onValueChange = viewModel::onScannedBarcodeChanged,
-                                label = { Text("Destination Box Barcode") },
-                                modifier = Modifier.fillMaxWidth(),
-                                trailingIcon = {
-                                    IconButton(onClick = {
-                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
-                                            viewModel.onScannedBarcodeChanged(barcode)
-                                            viewModel.scanDestinationBox(barcode)
-                                        }
-                                    }) {
-                                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
-                                    }
-                                }
-                            )
-                            
                             Button(
-                                onClick = { viewModel.scanDestinationBox(scannedBarcode) },
+                                onClick = {
+                                    viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                        val clean = barcode.trim().uppercase()
+                                        viewModel.onScannedBarcodeChanged(clean)
+                                        viewModel.scanDestinationBox(clean)
+                                    }
+                                },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Icon(Icons.Default.QrCodeScanner, contentDescription = null)
@@ -188,30 +177,19 @@ fun MergeScreen(
                                 )
                             }
                             
-                            OutlinedTextField(
-                                value = scannedBarcode,
-                                onValueChange = viewModel::onScannedBarcodeChanged,
-                                label = { Text("Source Box Barcode") },
-                                modifier = Modifier.fillMaxWidth(),
-                                trailingIcon = {
-                                    IconButton(onClick = {
-                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
-                                            viewModel.onScannedBarcodeChanged(barcode)
-                                            viewModel.scanSourceBox(barcode)
-                                        }
-                                    }) {
-                                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
-                                    }
-                                }
-                            )
-                            
                             Button(
-                                onClick = { viewModel.scanSourceBox(scannedBarcode) },
+                                onClick = {
+                                    viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                        val clean = barcode.trim().uppercase()
+                                        viewModel.onScannedBarcodeChanged(clean)
+                                        viewModel.scanSourceBox(clean)
+                                    }
+                                },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Add Source Box")
+                                Text("Scan Source Box")
                             }
                         }
                     }

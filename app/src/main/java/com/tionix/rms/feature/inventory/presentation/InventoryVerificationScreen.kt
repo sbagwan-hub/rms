@@ -202,31 +202,29 @@ fun InventoryVerificationScreen(
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-                        
-                        OutlinedTextField(
-                            value = scannedBarcode,
-                            onValueChange = viewModel::onScannedBarcodeChanged,
-                            label = { Text("File Barcode") },
-                            modifier = Modifier.fillMaxWidth(),
-                            trailingIcon = {
-                                IconButton(onClick = {
-                                    scannerManager.startCameraScan(context) { barcode ->
-                                        viewModel.onScannedBarcodeChanged(barcode)
-                                        viewModel.verifyBox(barcode)
-                                    }
-                                }) {
-                                    Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
-                                }
-                            }
-                        )
-                        
+
                         Button(
-                            onClick = { viewModel.verifyBox(scannedBarcode) },
+                            onClick = {
+                                scannerManager.startCameraScan(context) { barcode ->
+                                    val clean = barcode.trim().uppercase()
+                                    viewModel.onScannedBarcodeChanged(clean)
+                                    viewModel.verifyBox(clean)
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Verify File")
+                            Text("Scan Barcode")
+                        }
+
+                        if (scannedBarcode.isNotBlank()) {
+                            Text(
+                                text = "Scanned: $scannedBarcode",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }

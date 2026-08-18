@@ -119,23 +119,21 @@ fun RefileScreen(
                             }
                         }
                         
-                        OutlinedTextField(
-                            value = scannedBarcode,
-                            onValueChange = viewModel::onScannedBarcodeChanged,
-                            label = { Text("File Barcode") },
-                            modifier = Modifier.fillMaxWidth(),
-                            trailingIcon = {
-                                IconButton(onClick = {
-                                    viewModel.scannerRepository.startCameraScan(context) { barcode ->
-                                        viewModel.onScannedBarcodeChanged(barcode)
-                                        viewModel.scanFile()
-                                    }
-                                }) {
-                                    Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
+                        Button(
+                            onClick = {
+                                viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                    val clean = barcode.trim().uppercase()
+                                    viewModel.onScannedBarcodeChanged(clean)
+                                    viewModel.scanFile()
                                 }
-                            }
-                        )
-                        
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (scannedBarcode.isBlank()) "Scan File" else "Rescan File (${scannedBarcode})")
+                        }
+
                         // Show current file details when scanned
                         if (file != null) {
                             Card(
@@ -167,25 +165,23 @@ fun RefileScreen(
                                 }
                             }
                         }
-                        
+
                         // Destination Box Scanning
                         if (file != null) {
-                            OutlinedTextField(
-                                value = destinationBoxBarcode,
-                                onValueChange = viewModel::onDestinationBoxBarcodeChanged,
-                                label = { Text("Destination Box Barcode") },
-                                modifier = Modifier.fillMaxWidth(),
-                                trailingIcon = {
-                                    IconButton(onClick = {
-                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
-                                            viewModel.onDestinationBoxBarcodeChanged(barcode)
-                                            viewModel.confirmRefile()
-                                        }
-                                    }) {
-                                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan")
+                            Button(
+                                onClick = {
+                                    viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                        val clean = barcode.trim().uppercase()
+                                        viewModel.onDestinationBoxBarcodeChanged(clean)
+                                        viewModel.confirmRefile()
                                     }
-                                }
-                            )
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(if (destinationBoxBarcode.isBlank()) "Scan Destination Box" else "Rescan Destination Box (${destinationBoxBarcode})")
+                            }
                             
                             Button(
                                 onClick = { viewModel.confirmRefile() },

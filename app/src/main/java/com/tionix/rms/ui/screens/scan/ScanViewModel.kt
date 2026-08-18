@@ -124,10 +124,20 @@ class ScanViewModel @Inject constructor(
         super.onCleared()
     }
 
-    /** Also called by the manual-entry field (damaged/unreadable labels). */
+    private var lastProcessedBarcode: String? = null
+    private var lastProcessedTime: Long = 0
+
     fun onBarcode(barcode: String) {
-        val code = barcode.trim()
+        val code = barcode.trim().uppercase()
         if (code.isEmpty()) return
+
+        val now = System.currentTimeMillis()
+        if (code == lastProcessedBarcode && (now - lastProcessedTime) < 1500) {
+            // Duplicate debounce within 1.5s
+            return
+        }
+        lastProcessedBarcode = code
+        lastProcessedTime = now
 
         _state.update {
             it.copy(
@@ -144,7 +154,7 @@ class ScanViewModel @Inject constructor(
             // 1. Lookup barcode against backend
             scanRepository.lookup(code).fold(
                 onSuccess = { lookupData ->
-                    beepPlayer.playSuccess()
+                    beepPlayer.positive()
                     _state.update {
                         it.copy(loading = false, result = lookupData, error = null)
                     }
@@ -157,14 +167,16 @@ class ScanViewModel @Inject constructor(
                     )
                 },
                 onFailure = { error ->
-                    beepPlayer.playError()
+                    beepPlayer.error()
                     _state.update {
                         it.copy(
                             loading = false,
-                            error = error.message ?: "Lookup failed",
+                            error = if (error.message?.contains("not found", ignoreCase = true) == true ||
+                                        error.message?.contains("BARCODE_UNKNOWN", ignoreCase = true) == true)
+                                "Barcode '$code' not found" else (error.message ?: "Lookup failed"),
                         )
                     }
-                },
+                }
             )
         }
     }
