@@ -134,8 +134,37 @@ class ScanViewModel @Inject constructor(
                 lastBarcode = code,
                 loading = true,
                 error = null,
+                result = null,
                 recorded = false,
                 history = (listOf(code) + it.history).take(20),
+            )
+        }
+
+        viewModelScope.launch {
+            // 1. Lookup barcode against backend
+            scanRepository.lookup(code).fold(
+                onSuccess = { lookupData ->
+                    beepPlayer.playSuccess()
+                    _state.update {
+                        it.copy(loading = false, result = lookupData, error = null)
+                    }
+                    // 2. Record the scan (fire-and-forget)
+                    scanRepository.record(code, lat = null, lng = null).fold(
+                        onSuccess = {
+                            _state.update { it.copy(recorded = true) }
+                        },
+                        onFailure = { /* recording failed — non-critical */ }
+                    )
+                },
+                onFailure = { error ->
+                    beepPlayer.playError()
+                    _state.update {
+                        it.copy(
+                            loading = false,
+                            error = error.message ?: "Lookup failed",
+                        )
+                    }
+                },
             )
         }
     }
