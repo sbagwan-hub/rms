@@ -14,6 +14,7 @@ data class PathSegment(
 )
 
 data class EntityData(
+    val id: String? = null,
     val barcode: String,
     val status: String? = null,
     val capacity: Int? = null,

@@ -80,8 +80,13 @@ class HoneywellScannerManager @Inject constructor(
                 ?: intent.getStringExtra("value")
 
             if (barcode != null) {
+                val trimmed = barcode.trim()
                 CoroutineScope(Dispatchers.Default).launch {
-                    _scanResults.emit(barcode.trim())
+                    _scanResults.emit(trimmed)
+                }
+                activeScanCallback?.let { cb ->
+                    activeScanCallback = null
+                    cb(trimmed)
                 }
             }
         }
@@ -174,27 +179,12 @@ class HoneywellScannerManager @Inject constructor(
         isClaimed = true
     }
 
+    private var activeScanCallback: ((String) -> Unit)? = null
+
     override fun startCameraScan(context: Context, onScanResult: ((String) -> Unit)?) {
-        val options = GmsBarcodeScannerOptions.Builder()
-            .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
-            .enableAutoZoom()
-            .build()
-
-        val scanner = GmsBarcodeScanning.getClient(context, options)
-
-        scanner.startScan()
-            .addOnSuccessListener { barcode: com.google.mlkit.vision.barcode.common.Barcode ->
-                val rawValue = barcode.rawValue
-                if (rawValue != null) {
-                    val trimmed = rawValue.trim()
-                    CoroutineScope(Dispatchers.Default).launch {
-                        _scanResults.emit(trimmed)
-                    }
-                    onScanResult?.invoke(trimmed)
-                }
-            }
-            .addOnFailureListener { e ->
-                // Handle/log error if necessary
-            }
+        // Enforce hardware scanner on Honeywell device globally. Never open Android Camera.
+        activeScanCallback = onScanResult
+        enable()
+        startScanTrigger()
     }
 }

@@ -8,6 +8,9 @@ data class BoxDetailDto(
     val id: String,
     val barcode: String,
     val name: String?,
+    val boxType: String? = null,
+    val warehouse: String? = null,
+    val site: String? = null,
     val location: String,
     val status: String,
     val fileCount: Int,
@@ -28,6 +31,9 @@ fun BoxDetailDto.toDomain(): BoxDetail = BoxDetail(
     id = id,
     barcode = barcode,
     name = name,
+    boxType = boxType ?: "STANDARD",
+    warehouse = warehouse ?: "Unassigned",
+    site = site ?: "Unassigned",
     location = location,
     status = when (status.uppercase()) {
         "ACTIVE" -> BoxStatus.ACTIVE

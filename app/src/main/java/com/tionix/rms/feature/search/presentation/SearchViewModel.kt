@@ -123,14 +123,19 @@ class SearchViewModel @Inject constructor(
 
     fun getBoxDetail(boxId: String) {
         viewModelScope.launch {
+            android.util.Log.d("SearchViewModel", "BOX DETAIL ID: $boxId, VIEWMODEL STATE: Loading")
             _uiState.value = SearchUiState.Loading
             val result = getBoxDetailUseCase(boxId)
             
             if (result.isSuccess) {
-                _boxDetail.value = result.getOrNull()
+                val detail = result.getOrNull()
+                android.util.Log.d("SearchViewModel", "BOX DETAIL STATUS: 200 OK, VIEWMODEL STATE: Success, Barcode: ${detail?.barcode}")
+                _boxDetail.value = detail
                 _uiState.value = SearchUiState.BoxDetailLoaded
             } else {
-                _uiState.value = SearchUiState.Error(result.exceptionOrNull()?.message ?: "Failed to load box details")
+                val errMsg = result.exceptionOrNull()?.message ?: "Failed to load box details"
+                android.util.Log.e("SearchViewModel", "BOX DETAIL ERROR: $errMsg, VIEWMODEL STATE: Error")
+                _uiState.value = SearchUiState.Error(errMsg)
             }
         }
     }

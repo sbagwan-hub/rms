@@ -64,7 +64,20 @@ class SearchRepositoryImpl @Inject constructor(
             if (response.isSuccessful && response.body()?.success == true) {
                 Result.success(response.body()?.message ?: "File inserted successfully")
             } else {
-                Result.failure(Exception(response.body()?.message ?: "Failed to insert file"))
+                val errorBodyStr = response.errorBody()?.string()
+                val serverMsg = try {
+                    if (!errorBodyStr.isNullOrBlank()) {
+                        val json = com.google.gson.JsonParser.parseString(errorBodyStr).asJsonObject
+                        if (json.has("error") && json.get("error").isJsonObject) {
+                            json.getAsJsonObject("error").get("message")?.asString
+                        } else if (json.has("message")) {
+                            json.get("message")?.asString
+                        } else null
+                    } else null
+                } catch (ex: Exception) {
+                    null
+                }
+                Result.failure(Exception(serverMsg ?: response.body()?.message ?: "Failed to insert file"))
             }
         } catch (e: Exception) {
             Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))

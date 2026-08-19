@@ -156,19 +156,21 @@ fun ScanScreen(
 
             // Lookup result — entity header + its CONTENTS
             state.result?.let { result ->
+                val entityIdOrBarcode = result.entity.id ?: result.entity.barcode
                 EntityHeader(
                     result = result,
                     recorded = state.recorded,
-                    onOpenBoxDetail = { onNavigateToBoxDetail(result.entity.barcode) },
-                    onOpenFileDetail = { onNavigateToFileDetail(result.entity.barcode) }
+                    onOpenBoxDetail = { onNavigateToBoxDetail(entityIdOrBarcode) },
+                    onOpenFileDetail = { onNavigateToFileDetail(entityIdOrBarcode) }
                 )
                 ContentsList(
                     result = result,
                     onSelectContent = { item ->
+                        val targetId = item.id.ifBlank { item.barcode }
                         if (result.entityType == "BOX") {
-                            onNavigateToFileDetail(item.barcode)
+                            onNavigateToFileDetail(targetId)
                         } else if (result.entityType == "LOCATION") {
-                            onNavigateToBoxDetail(item.barcode)
+                            onNavigateToBoxDetail(targetId)
                         }
                     }
                 )

@@ -41,13 +41,20 @@ class DashboardViewModel @Inject constructor(
         .map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     init {
-        loadDashboardData()
+        loadDashboardData(isRefresh = false)
     }
 
-    fun loadDashboardData() {
+    fun loadDashboardData(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = DashboardUiState.Loading
+            if (isRefresh) {
+                _isRefreshing.value = true
+            } else if (_uiState.value !is DashboardUiState.Success) {
+                _uiState.value = DashboardUiState.Loading
+            }
 
             val canViewReports = canViewReports()
             val statsResult = getDashboardStatsUseCase()
@@ -62,12 +69,15 @@ class DashboardViewModel @Inject constructor(
                     canViewReports = canViewReports
                 )
             } else {
-                _uiState.value = DashboardUiState.Error(
-                    statsResult.exceptionOrNull()?.message
-                        ?: tasksResult.exceptionOrNull()?.message
-                        ?: "Unknown error"
-                )
+                if (_uiState.value !is DashboardUiState.Success) {
+                    _uiState.value = DashboardUiState.Error(
+                        statsResult.exceptionOrNull()?.message
+                            ?: tasksResult.exceptionOrNull()?.message
+                            ?: "Unknown error"
+                    )
+                }
             }
+            _isRefreshing.value = false
         }
     }
 
@@ -78,7 +88,7 @@ class DashboardViewModel @Inject constructor(
     }
 
     fun refresh() {
-        loadDashboardData()
+        loadDashboardData(isRefresh = true)
     }
 
     fun logout() {

@@ -150,10 +150,13 @@ class ScanViewModel @Inject constructor(
             )
         }
 
+        android.util.Log.d("ScanViewModel", "SCAN VALUE: $code")
+
         viewModelScope.launch {
             // 1. Lookup barcode against backend
             scanRepository.lookup(code).fold(
                 onSuccess = { lookupData ->
+                    android.util.Log.d("ScanViewModel", "ENTITY TYPE: ${lookupData.entityType}, ENTITY ID: ${lookupData.entity.id ?: lookupData.entity.barcode}")
                     beepPlayer.positive()
                     _state.update {
                         it.copy(loading = false, result = lookupData, error = null)
@@ -167,6 +170,7 @@ class ScanViewModel @Inject constructor(
                     )
                 },
                 onFailure = { error ->
+                    android.util.Log.e("ScanViewModel", "Lookup failed for $code: ${error.message}")
                     beepPlayer.error()
                     _state.update {
                         it.copy(
