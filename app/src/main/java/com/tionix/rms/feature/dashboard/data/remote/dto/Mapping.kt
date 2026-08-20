@@ -19,15 +19,38 @@ fun DashboardStatsDto.toDomain(): DashboardStats {
 }
 
 fun TaskDto.toDomain(): Task {
+    val safeType = try {
+        TaskType.valueOf(type.uppercase())
+    } catch (e: Exception) {
+        TaskType.CUSTOM
+    }
+
+    val safeStatus = try {
+        TaskStatus.valueOf(status.uppercase())
+    } catch (e: Exception) {
+        TaskStatus.ASSIGNED
+    }
+
+    val safePriority = try {
+        TaskPriority.valueOf(priority.uppercase())
+    } catch (e: Exception) {
+        TaskPriority.MEDIUM
+    }
+
     return Task(
         id = id,
-        type = TaskType.valueOf(type),
+        taskNumber = taskNumber,
+        type = safeType,
         title = title,
-        description = description,
-        status = TaskStatus.valueOf(status),
-        priority = TaskPriority.valueOf(priority),
-        assignedTo = assignedTo,
+        description = description ?: "",
+        status = safeStatus,
+        priority = safePriority,
+        assignedTo = assignedTo ?: "Unassigned",
         createdAt = createdAt,
-        dueDate = dueDate
+        dueDate = dueDate,
+        boxBarcode = boxBarcode,
+        fileBarcode = fileBarcode,
+        sourceLocation = sourceLocation,
+        destinationLocation = destinationLocation
     )
 }

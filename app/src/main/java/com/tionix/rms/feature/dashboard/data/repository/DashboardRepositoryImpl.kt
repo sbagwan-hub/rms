@@ -81,4 +81,56 @@ class DashboardRepositoryImpl @Inject constructor(
             Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
         }
     }
+
+    override suspend fun acceptTask(taskId: String): Result<Boolean> {
+        return try {
+            val response = apiService.acceptTask(taskId)
+            if (response.isSuccessful) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception("Failed to accept task (HTTP ${response.code()})"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
+        }
+    }
+
+    override suspend fun startTask(taskId: String): Result<Boolean> {
+        return try {
+            val response = apiService.startTask(taskId)
+            if (response.isSuccessful) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception("Failed to start task (HTTP ${response.code()})"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
+        }
+    }
+
+    override suspend fun completeTask(taskId: String, payload: Map<String, String>): Result<Boolean> {
+        return try {
+            val response = apiService.completeTask(taskId, payload)
+            if (response.isSuccessful) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception("Failed to complete task (HTTP ${response.code()})"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
+        }
+    }
+
+    override suspend fun rejectTask(taskId: String, reason: String): Result<Boolean> {
+        return try {
+            val response = apiService.rejectTask(taskId, mapOf("reason" to reason))
+            if (response.isSuccessful) {
+                Result.success(true)
+            } else {
+                Result.failure(Exception("Failed to reject task (HTTP ${response.code()})"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
+        }
+    }
 }
