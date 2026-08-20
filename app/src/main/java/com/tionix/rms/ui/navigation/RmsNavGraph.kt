@@ -124,12 +124,13 @@ fun RmsNavGraph() {
                 DashboardScreen(
                     onTaskClick = { task ->
                         val route = when (task.type) {
-                            TaskType.FRESH_BOX_MOVE -> RmsRoutes.FRESH_BOX_MOVE
-                            TaskType.INVENTORY_VERIFICATION -> RmsRoutes.INVENTORY_VERIFICATION
-                            TaskType.REFILE -> RmsRoutes.REFILE
+                            TaskType.FRESH_BOX_MOVE, TaskType.BOX_SCAN -> RmsRoutes.FRESH_BOX_MOVE
+                            TaskType.INVENTORY_VERIFICATION, TaskType.LOCATION_VERIFICATION, TaskType.FILE_VERIFICATION, TaskType.BOX_VERIFICATION -> RmsRoutes.INVENTORY_VERIFICATION
+                            TaskType.REFILE, TaskType.FILE_REFILE -> RmsRoutes.REFILE
                             TaskType.SEGREGATION -> RmsRoutes.SEGREGATION
                             TaskType.MERGE -> RmsRoutes.MERGE
-                            TaskType.TRANSFER -> RmsRoutes.TRANSFER
+                            TaskType.TRANSFER, TaskType.BOX_TRANSFER -> RmsRoutes.TRANSFER
+                            else -> RmsRoutes.INVENTORY_VERIFICATION
                         }
                         navController.navigate(route)
                     },

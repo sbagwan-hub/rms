@@ -36,7 +36,9 @@ fun RefileScreen(
     val showMismatchDialog by viewModel.showMismatchDialog.collectAsStateWithLifecycle()
     val showSessionSummary by viewModel.showSessionSummary.collectAsStateWithLifecycle()
     val batchMode by viewModel.batchMode.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
+
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -74,9 +76,10 @@ fun RefileScreen(
                     )
                     Text("Batch Mode", modifier = Modifier.padding(end = 16.dp))
                     
-                    IconButton(onClick = { viewModel.loadAssignedRefiles() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
+                    com.tionix.rms.ui.components.RMSRefreshIconButton(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.loadAssignedRefiles(isRefresh = true) }
+                    )
                     
                     if (batchMode && sessionActions.isNotEmpty()) {
                         IconButton(onClick = { viewModel.showSessionSummary() }) {

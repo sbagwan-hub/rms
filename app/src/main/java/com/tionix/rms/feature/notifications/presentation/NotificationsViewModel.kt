@@ -24,22 +24,33 @@ class NotificationsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow<NotificationsUiState>(NotificationsUiState.Loading)
     val uiState: StateFlow<NotificationsUiState> = _uiState.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     init {
         loadNotifications()
     }
 
-    fun loadNotifications() {
+    fun loadNotifications(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = NotificationsUiState.Loading
+            if (isRefresh && _uiState.value is NotificationsUiState.Success) {
+                _isRefreshing.value = true
+            } else {
+                _uiState.value = NotificationsUiState.Loading
+            }
+
             val result = getNotificationsUseCase()
             
             if (result.isSuccess) {
                 _uiState.value = NotificationsUiState.Success(result.getOrNull() ?: emptyList())
             } else {
-                _uiState.value = NotificationsUiState.Error(
-                    result.exceptionOrNull()?.message ?: "Failed to load notifications"
-                )
+                if (!isRefresh || _uiState.value !is NotificationsUiState.Success) {
+                    _uiState.value = NotificationsUiState.Error(
+                        result.exceptionOrNull()?.message ?: "Failed to load notifications"
+                    )
+                }
             }
+            _isRefreshing.value = false
         }
     }
 

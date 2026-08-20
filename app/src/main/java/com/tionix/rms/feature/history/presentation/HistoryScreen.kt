@@ -42,6 +42,7 @@ fun HistoryScreen(
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val pendingCount = uiState.pendingOps.count { it.state == "QUEUED" || it.state == "FAILED" }
 
     Scaffold(
@@ -66,6 +67,10 @@ fun HistoryScreen(
                     }
                 },
                 actions = {
+                    com.tionix.rms.ui.components.RMSRefreshIconButton(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.refresh() }
+                    )
                     TextButton(onClick = { viewModel.manualSync() }) {
                         Icon(Icons.Default.Sync, contentDescription = null)
                         Spacer(Modifier.width(4.dp))

@@ -56,9 +56,30 @@ class HistoryViewModel @Inject constructor(
         }
     }
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     fun manualSync() {
         viewModelScope.launch {
             historyRepository.triggerManualSync()
+        }
+    }
+
+    fun refresh() {
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            val result = historyRepository.getSyncedOperations()
+            _uiState.update {
+                if (result.isSuccess) {
+                    it.copy(
+                        syncedOps = result.getOrNull().orEmpty(),
+                        syncedError = null
+                    )
+                } else {
+                    it
+                }
+            }
+            _isRefreshing.value = false
         }
     }
 }

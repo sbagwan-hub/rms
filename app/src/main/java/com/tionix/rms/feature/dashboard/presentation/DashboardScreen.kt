@@ -42,6 +42,7 @@ fun DashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val pendingSyncCount by viewModel.pendingSyncCount.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         viewModel.loggedOut.collect { onLogout() }
@@ -77,9 +78,10 @@ fun DashboardScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.refresh() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
+                    com.tionix.rms.ui.components.RMSRefreshIconButton(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.refresh() }
+                    )
                     IconButton(onClick = { viewModel.logout() }) {
                         Icon(Icons.Default.Logout, contentDescription = "Logout")
                     }
@@ -688,10 +690,12 @@ private fun TaskCard(
 @Composable
 private fun StatusBadge(status: TaskStatus) {
     val (color, label) = when (status) {
-        TaskStatus.PENDING -> MaterialTheme.colorScheme.tertiary to "Pending"
+        TaskStatus.PENDING, TaskStatus.ASSIGNED -> MaterialTheme.colorScheme.tertiary to "Assigned"
+        TaskStatus.ACCEPTED -> MaterialTheme.colorScheme.primary to "Accepted"
         TaskStatus.IN_PROGRESS -> MaterialTheme.colorScheme.secondary to "In Progress"
         TaskStatus.COMPLETED -> SuccessGreen to "Completed"
-        TaskStatus.FAILED -> MaterialTheme.colorScheme.error to "Failed"
+        TaskStatus.REJECTED, TaskStatus.CANCELLED, TaskStatus.FAILED -> MaterialTheme.colorScheme.error to status.name
+        else -> MaterialTheme.colorScheme.tertiary to status.name
     }
 
     Surface(
@@ -714,10 +718,13 @@ private fun TypeBadge(type: TaskType) {
     val label = when (type) {
         TaskType.FRESH_BOX_MOVE -> "Box Move"
         TaskType.INVENTORY_VERIFICATION -> "Verification"
-        TaskType.REFILE -> "Refile"
+        TaskType.REFILE, TaskType.FILE_REFILE -> "Refile"
         TaskType.SEGREGATION -> "Segregation"
         TaskType.MERGE -> "Merge"
-        TaskType.TRANSFER -> "Transfer"
+        TaskType.TRANSFER, TaskType.BOX_TRANSFER -> "Transfer"
+        TaskType.FILE_INSERT -> "File Insert"
+        TaskType.BOX_SCAN -> "Box Scan"
+        else -> type.name.replace("_", " ")
     }
 
     Surface(

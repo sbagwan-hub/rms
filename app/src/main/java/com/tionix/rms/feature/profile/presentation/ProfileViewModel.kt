@@ -35,13 +35,21 @@ class ProfileViewModel @Inject constructor(
     private val _switchMessage = MutableStateFlow<String?>(null)
     val switchMessage: StateFlow<String?> = _switchMessage.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     init {
         refresh()
     }
 
     fun refresh() {
         viewModelScope.launch {
-            _uiState.value = ProfileUiState.Loading
+            if (_profile.value != null) {
+                _isRefreshing.value = true
+            } else {
+                _uiState.value = ProfileUiState.Loading
+            }
+
             val profileResult = getProfileUseCase()
             val pendingResult = getPendingSyncCountUseCase()
             if (profileResult.isSuccess) {
@@ -49,10 +57,13 @@ class ProfileViewModel @Inject constructor(
                 _pendingSyncCount.value = pendingResult.getOrNull() ?: 0
                 _uiState.value = ProfileUiState.Success
             } else {
-                _uiState.value = ProfileUiState.Error(
-                    profileResult.exceptionOrNull()?.message ?: "Failed to load profile"
-                )
+                if (_profile.value == null) {
+                    _uiState.value = ProfileUiState.Error(
+                        profileResult.exceptionOrNull()?.message ?: "Failed to load profile"
+                    )
+                }
             }
+            _isRefreshing.value = false
         }
     }
 

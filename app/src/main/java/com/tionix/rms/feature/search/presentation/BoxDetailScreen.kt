@@ -16,6 +16,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tionix.rms.feature.search.domain.model.BoxStatus
 import com.tionix.rms.ui.common.LoadingState
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -32,7 +33,15 @@ fun BoxDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val boxDetail by viewModel.boxDetail.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val context = androidx.compose.ui.platform.LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshError.collect { errorMsg ->
+            snackbarHostState.showSnackbar(errorMsg)
+        }
+    }
 
     var showInsertDialog by remember { mutableStateOf(false) }
     var inputBarcode by remember { mutableStateOf("") }
@@ -66,12 +75,12 @@ fun BoxDetailScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            if (showInsertDialog) viewModel.stopScanner()
             viewModel.scannerRepository.disableScanner()
             viewModel.clearBoxDetail()
         }
     }
 
-    val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
     if (showInsertDialog) {
@@ -245,9 +254,10 @@ fun BoxDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.getBoxDetail(boxId) }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
+                    com.tionix.rms.ui.components.RMSRefreshIconButton(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.getBoxDetail(boxId, isRefresh = true) }
+                    )
                 }
             )
         }

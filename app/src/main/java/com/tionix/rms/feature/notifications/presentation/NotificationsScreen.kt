@@ -24,6 +24,7 @@ fun NotificationsScreen(
     viewModel: NotificationsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -35,9 +36,10 @@ fun NotificationsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.loadNotifications() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
+                    com.tionix.rms.ui.components.RMSRefreshIconButton(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.loadNotifications(isRefresh = true) }
+                    )
                 }
             )
         }

@@ -30,6 +30,14 @@ fun FileDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val fileDetail by viewModel.fileDetail.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshError.collect { errorMsg ->
+            snackbarHostState.showSnackbar(errorMsg)
+        }
+    }
 
     LaunchedEffect(fileId) {
         viewModel.getFileDetail(fileId)
@@ -42,6 +50,7 @@ fun FileDetailScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("File Detail") },
@@ -51,9 +60,10 @@ fun FileDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.getFileDetail(fileId) }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
+                    com.tionix.rms.ui.components.RMSRefreshIconButton(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.getFileDetail(fileId, isRefresh = true) }
+                    )
                 }
             )
         }

@@ -14,8 +14,11 @@ import com.tionix.rms.feature.search.domain.usecase.SearchUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
@@ -46,6 +49,12 @@ class SearchViewModel @Inject constructor(
 
     private val _boxDetail = MutableStateFlow<BoxDetail?>(null)
     val boxDetail: StateFlow<BoxDetail?> = _boxDetail.asStateFlow()
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _refreshError = MutableSharedFlow<String>()
+    val refreshError: SharedFlow<String> = _refreshError.asSharedFlow()
 
     private val _isOffline = MutableStateFlow(false)
     val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
@@ -121,22 +130,29 @@ class SearchViewModel @Inject constructor(
         }
     }
 
-    fun getBoxDetail(boxId: String) {
+    fun getBoxDetail(boxId: String, isRefresh: Boolean = false) {
         viewModelScope.launch {
-            android.util.Log.d("SearchViewModel", "BOX DETAIL ID: $boxId, VIEWMODEL STATE: Loading")
-            _uiState.value = SearchUiState.Loading
+            if (isRefresh && _boxDetail.value != null) {
+                _isRefreshing.value = true
+            } else {
+                _uiState.value = SearchUiState.Loading
+            }
+            
             val result = getBoxDetailUseCase(boxId)
             
             if (result.isSuccess) {
                 val detail = result.getOrNull()
-                android.util.Log.d("SearchViewModel", "BOX DETAIL STATUS: 200 OK, VIEWMODEL STATE: Success, Barcode: ${detail?.barcode}")
                 _boxDetail.value = detail
                 _uiState.value = SearchUiState.BoxDetailLoaded
             } else {
                 val errMsg = result.exceptionOrNull()?.message ?: "Failed to load box details"
-                android.util.Log.e("SearchViewModel", "BOX DETAIL ERROR: $errMsg, VIEWMODEL STATE: Error")
-                _uiState.value = SearchUiState.Error(errMsg)
+                if (isRefresh && _boxDetail.value != null) {
+                    _refreshError.emit("Unable to refresh box details. Please try again.")
+                } else {
+                    _uiState.value = SearchUiState.Error(errMsg)
+                }
             }
+            _isRefreshing.value = false
         }
     }
 

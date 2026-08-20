@@ -23,6 +23,7 @@ fun ReportsScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val selectedReportType by viewModel.selectedReportType.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     var showHistoryTab by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -35,9 +36,10 @@ fun ReportsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.loadData() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
+                    com.tionix.rms.ui.components.RMSRefreshIconButton(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.loadData(isRefresh = true) }
+                    )
                 }
             )
         }

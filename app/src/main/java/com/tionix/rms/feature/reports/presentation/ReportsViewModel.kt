@@ -26,13 +26,20 @@ class ReportsViewModel @Inject constructor(
     private val _selectedReportType = MutableStateFlow<ReportType?>(null)
     val selectedReportType: StateFlow<ReportType?> = _selectedReportType.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
     init {
         loadData()
     }
 
-    fun loadData() {
+    fun loadData(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = ReportsUiState.Loading
+            if (isRefresh && _uiState.value is ReportsUiState.Success) {
+                _isRefreshing.value = true
+            } else {
+                _uiState.value = ReportsUiState.Loading
+            }
             
             val reportsResult = getReportsUseCase(_selectedReportType.value)
             val historyResult = getActivityHistoryUseCase()
@@ -43,10 +50,13 @@ class ReportsViewModel @Inject constructor(
                     activityHistory = historyResult.getOrNull() ?: emptyList()
                 )
             } else {
-                _uiState.value = ReportsUiState.Error(
-                    reportsResult.exceptionOrNull()?.message ?: historyResult.exceptionOrNull()?.message ?: "Failed to load data"
-                )
+                if (!isRefresh || _uiState.value !is ReportsUiState.Success) {
+                    _uiState.value = ReportsUiState.Error(
+                        reportsResult.exceptionOrNull()?.message ?: historyResult.exceptionOrNull()?.message ?: "Failed to load data"
+                    )
+                }
             }
+            _isRefreshing.value = false
         }
     }
 

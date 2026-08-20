@@ -2,6 +2,8 @@ package com.tionix.rms.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -151,6 +153,34 @@ fun RMSStatCard(
                 style = MaterialTheme.typography.bodySmall.copy(
                     color = MaterialTheme.colorScheme.secondary
                 )
+            )
+        }
+    }
+}
+
+@Composable
+fun RMSRefreshIconButton(
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = MaterialTheme.colorScheme.onSurface
+) {
+    IconButton(
+        onClick = onRefresh,
+        enabled = !isRefreshing,
+        modifier = modifier
+    ) {
+        if (isRefreshing) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(20.dp),
+                color = MaterialTheme.colorScheme.primary,
+                strokeWidth = 2.dp
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = "Refresh",
+                tint = tint
             )
         }
     }

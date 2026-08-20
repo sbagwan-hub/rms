@@ -12,8 +12,11 @@ import com.tionix.rms.feature.filesearch.domain.usecase.SearchFileByBarcodeUseCa
 import com.tionix.rms.feature.filesearch.domain.usecase.SearchFilesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
@@ -40,6 +43,12 @@ class FileSearchViewModel @Inject constructor(
 
     private val _fileDetail = MutableStateFlow<FileDetail?>(null)
     val fileDetail: StateFlow<FileDetail?> = _fileDetail.asStateFlow()
+
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _refreshError = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+    val refreshError: kotlinx.coroutines.flow.SharedFlow<String> = _refreshError.asSharedFlow()
 
     private val _isOffline = MutableStateFlow(false)
     val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
@@ -108,22 +117,33 @@ class FileSearchViewModel @Inject constructor(
         }
     }
 
-    fun getFileDetail(fileId: String) {
+    fun getFileDetail(fileId: String, isRefresh: Boolean = false) {
         val cleanId = fileId.trim().replace("\r", "").replace("\n", "").replace("\t", "")
         if (cleanId.isBlank()) {
             _uiState.value = FileSearchUiState.Error("Invalid file barcode or ID")
             return
         }
         viewModelScope.launch {
-            _uiState.value = FileSearchUiState.Loading
+            if (isRefresh && _fileDetail.value != null) {
+                _isRefreshing.value = true
+            } else {
+                _uiState.value = FileSearchUiState.Loading
+            }
+
             val result = getFileDetailUseCase(cleanId)
             
             if (result.isSuccess) {
                 _fileDetail.value = result.getOrNull()
                 _uiState.value = FileSearchUiState.FileDetailLoaded
             } else {
-                _uiState.value = FileSearchUiState.Error(result.exceptionOrNull()?.message ?: "Failed to load file details")
+                val errMsg = result.exceptionOrNull()?.message ?: "Failed to load file details"
+                if (isRefresh && _fileDetail.value != null) {
+                    _refreshError.emit("Unable to refresh file details. Please try again.")
+                } else {
+                    _uiState.value = FileSearchUiState.Error(errMsg)
+                }
             }
+            _isRefreshing.value = false
         }
     }
 

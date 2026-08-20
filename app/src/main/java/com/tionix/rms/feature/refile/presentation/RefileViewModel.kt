@@ -109,18 +109,29 @@ class RefileViewModel @Inject constructor(
         }
     }
 
-    fun loadAssignedRefiles() {
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    fun loadAssignedRefiles(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = RefileUiState.Loading
+            if (isRefresh && _uiState.value is RefileUiState.Success) {
+                _isRefreshing.value = true
+            } else {
+                _uiState.value = RefileUiState.Loading
+            }
+
             val result = repository.getAssignedRefiles()
             
             if (result.isSuccess) {
                 _uiState.value = RefileUiState.Success(result.getOrNull() ?: emptyList())
             } else {
-                _uiState.value = RefileUiState.Error(
-                    result.exceptionOrNull()?.message ?: "Failed to load refiles"
-                )
+                if (!isRefresh || _uiState.value !is RefileUiState.Success) {
+                    _uiState.value = RefileUiState.Error(
+                        result.exceptionOrNull()?.message ?: "Failed to load refiles"
+                    )
+                }
             }
+            _isRefreshing.value = false
         }
     }
 
