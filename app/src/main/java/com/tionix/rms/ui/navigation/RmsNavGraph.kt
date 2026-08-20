@@ -196,6 +196,7 @@ fun RmsNavGraph() {
                     fileId = fileId,
                     onBack = { navController.popBackStack() },
                     onNavigateToRefile = { navController.navigate(RmsRoutes.REFILE) },
+                    onNavigateToBoxDetail = { boxId -> navController.navigate(RmsRoutes.boxDetail(boxId)) },
                     canRefile = true
                 )
             }

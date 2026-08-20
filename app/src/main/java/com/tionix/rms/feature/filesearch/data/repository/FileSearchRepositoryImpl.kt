@@ -41,13 +41,32 @@ class FileSearchRepositoryImpl @Inject constructor(
         }
     }
 
+    private fun parseErrorMessage(response: retrofit2.Response<*>): String {
+        return try {
+            val errorBody = response.errorBody()?.string()
+            if (!errorBody.isNullOrEmpty()) {
+                val json = org.json.JSONObject(errorBody)
+                if (json.has("error")) {
+                    val errObj = json.getJSONObject("error")
+                    errObj.optString("message", "")
+                } else {
+                    json.optString("message", "")
+                }
+            } else ""
+        } catch (e: Exception) {
+            ""
+        }
+    }
+
     override suspend fun getFileDetail(fileId: String): Result<FileDetail> {
         return try {
-            val response = apiService.getFileDetail(fileId)
+            val cleanId = fileId.trim().replace("\r", "").replace("\n", "").replace("\t", "")
+            val response = apiService.getFileDetail(cleanId)
             if (response.isSuccessful && response.body()?.data != null) {
                 Result.success(response.body()!!.data!!.toDomain())
             } else {
-                Result.failure(Exception("Failed to load file details"))
+                val errorMsg = parseErrorMessage(response)
+                Result.failure(Exception(if (errorMsg.isNotBlank()) errorMsg else "File barcode $cleanId was not found in the system."))
             }
         } catch (e: Exception) {
             Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))

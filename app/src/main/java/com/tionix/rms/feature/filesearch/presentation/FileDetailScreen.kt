@@ -24,6 +24,7 @@ fun FileDetailScreen(
     fileId: String,
     onBack: () -> Unit,
     onNavigateToRefile: (String) -> Unit = {},
+    onNavigateToBoxDetail: (String) -> Unit = {},
     canRefile: Boolean = false, // Role-gated: OPERATOR+
     viewModel: FileSearchViewModel = hiltViewModel()
 ) {
@@ -96,7 +97,10 @@ fun FileDetailScreen(
                                     )
                                     
                                     Divider()
-                                    
+
+                                    DetailItem("File ID", detail.id)
+                                    DetailItem("Client", detail.clientName ?: "Not assigned")
+                                    DetailItem("File Type", detail.fileType ?: "Not assigned")
                                     DetailItem("Created", detail.createdAt)
                                     if (detail.updatedAt != null) {
                                         DetailItem("Updated", detail.updatedAt)
@@ -115,8 +119,16 @@ fun FileDetailScreen(
                         }
                         
                         item {
+                            val boxTarget = detail.parentBox.id.ifBlank { detail.parentBox.barcode }
+                            val isClickable = boxTarget.isNotBlank() && boxTarget != "Unassigned"
+
                             Card(
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    if (isClickable) {
+                                        onNavigateToBoxDetail(boxTarget)
+                                    }
+                                }
                             ) {
                                 Row(
                                     modifier = Modifier.padding(16.dp),
@@ -141,7 +153,7 @@ fun FileDetailScreen(
                                             style = MaterialTheme.typography.titleSmall,
                                             fontWeight = FontWeight.Bold
                                         )
-                                        if (detail.parentBox.name != null) {
+                                        if (!detail.parentBox.name.isNullOrBlank()) {
                                             Text(
                                                 text = detail.parentBox.name,
                                                 style = MaterialTheme.typography.bodyMedium
@@ -151,6 +163,21 @@ fun FileDetailScreen(
                                             text = "Location: ${detail.parentBox.location}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        if (!detail.parentBox.warehouse.isNullOrBlank()) {
+                                            Text(
+                                                text = "Warehouse: ${detail.parentBox.warehouse}",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+
+                                    if (isClickable) {
+                                        Icon(
+                                            Icons.Default.ChevronRight,
+                                            contentDescription = "View Box",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
@@ -272,20 +299,40 @@ fun FileDetailScreen(
                 }
             }
             is FileSearchUiState.Error -> {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = state.message,
-                            color = MaterialTheme.colorScheme.onErrorContainer
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
                         )
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(
+                                text = state.message,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Button(
+                                onClick = { viewModel.getFileDetail(fileId) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Text("Retry")
+                            }
+                        }
                     }
                 }
             }

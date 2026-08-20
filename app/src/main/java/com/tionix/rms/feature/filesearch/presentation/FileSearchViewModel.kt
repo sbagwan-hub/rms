@@ -109,9 +109,14 @@ class FileSearchViewModel @Inject constructor(
     }
 
     fun getFileDetail(fileId: String) {
+        val cleanId = fileId.trim().replace("\r", "").replace("\n", "").replace("\t", "")
+        if (cleanId.isBlank()) {
+            _uiState.value = FileSearchUiState.Error("Invalid file barcode or ID")
+            return
+        }
         viewModelScope.launch {
             _uiState.value = FileSearchUiState.Loading
-            val result = getFileDetailUseCase(fileId)
+            val result = getFileDetailUseCase(cleanId)
             
             if (result.isSuccess) {
                 _fileDetail.value = result.getOrNull()

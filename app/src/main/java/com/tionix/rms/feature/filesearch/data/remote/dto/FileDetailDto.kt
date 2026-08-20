@@ -16,6 +16,8 @@ data class FileDetailDto(
     val id: String,
     val barcode: String,
     val title: String,
+    val clientName: String? = null,
+    val fileType: String? = null,
     val parentBox: ParentBoxDto,
     val locationChain: List<String>,
     val status: String,
@@ -28,7 +30,8 @@ data class ParentBoxDto(
     val id: String,
     val barcode: String,
     val name: String?,
-    val location: String
+    val location: String,
+    val warehouse: String? = null
 )
 
 data class MovementEventDto(
@@ -45,11 +48,14 @@ fun FileDetailDto.toDomain(): FileDetail = FileDetail(
     id = id,
     barcode = barcode,
     title = title,
+    clientName = clientName,
+    fileType = fileType,
     parentBox = ParentBox(
         id = parentBox.id,
         barcode = parentBox.barcode,
         name = parentBox.name,
-        location = parentBox.location
+        location = parentBox.location,
+        warehouse = parentBox.warehouse
     ),
     locationChain = locationChain,
     status = when (status.uppercase()) {

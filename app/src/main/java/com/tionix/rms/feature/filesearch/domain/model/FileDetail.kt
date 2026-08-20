@@ -4,6 +4,8 @@ data class FileDetail(
     val id: String,
     val barcode: String,
     val title: String,
+    val clientName: String? = null,
+    val fileType: String? = null,
     val parentBox: ParentBox,
     val locationChain: List<String>,
     val status: FileStatus,
@@ -16,7 +18,8 @@ data class ParentBox(
     val id: String,
     val barcode: String,
     val name: String?,
-    val location: String
+    val location: String,
+    val warehouse: String? = null
 )
 
 data class MovementEvent(
