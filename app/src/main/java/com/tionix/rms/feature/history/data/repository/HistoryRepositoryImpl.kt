@@ -46,7 +46,11 @@ class HistoryRepositoryImpl @Inject constructor(
                         status = dto.status,
                         performedAt = dto.performedAt,
                         summary = dto.summary,
-                        reasonCode = dto.reasonCode
+                        reasonCode = dto.reasonCode,
+                        boxId = dto.boxId,
+                        boxBarcode = dto.boxBarcode,
+                        fileId = dto.fileId,
+                        fileBarcode = dto.fileBarcode
                     )
                 }
             )

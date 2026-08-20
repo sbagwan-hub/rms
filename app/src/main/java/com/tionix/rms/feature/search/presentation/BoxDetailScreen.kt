@@ -16,6 +16,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tionix.rms.feature.search.domain.model.BoxStatus
 import com.tionix.rms.ui.common.LoadingState
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,6 +25,7 @@ fun BoxDetailScreen(
     onBack: () -> Unit,
     onNavigateToTransfer: (String) -> Unit = {},
     onNavigateToRefile: (String) -> Unit = {},
+    onOnFileClick: (String) -> Unit = {},
     canTransfer: Boolean = false, // Role-gated: SUPERVISOR/WAREHOUSE_MANAGER
     canRefile: Boolean = false, // Role-gated: OPERATOR+
     viewModel: SearchViewModel = hiltViewModel()
@@ -43,6 +45,7 @@ fun BoxDetailScreen(
 
     LaunchedEffect(showInsertDialog) {
         if (showInsertDialog) {
+            viewModel.startScanner()
             viewModel.scannerRepository.scanResults.collect { scanResult ->
                 if (scanResult.barcode.isNotBlank()) {
                     inputBarcode = scanResult.barcode.trim().uppercase()
@@ -68,7 +71,13 @@ fun BoxDetailScreen(
         }
     }
 
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     if (showInsertDialog) {
+        val isDuplicateSameBox = inputBarcode.isNotBlank() && boxDetail?.contents?.any { it.barcode.equals(inputBarcode.trim(), ignoreCase = true) } == true
+        val isBoxFull = (boxDetail?.availableSlots ?: 1) <= 0
+
         AlertDialog(
             onDismissRequest = {
                 if (!isInserting) {
@@ -81,7 +90,7 @@ fun BoxDetailScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "Point Honeywell scanner at File barcode (e.g. MAC5832438) or tap Scan below:",
+                        text = "Point Honeywell scanner at File barcode (e.g. MAC5832458) or tap Activate Scanner:",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -97,20 +106,54 @@ fun BoxDetailScreen(
                         Text(if (inputBarcode.isBlank()) "Activate Scanner" else "Scan Again")
                     }
 
-                    if (inputBarcode.isNotBlank()) {
+                    if (isDuplicateSameBox) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("⚠ File already exists in this box", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                                Spacer(Modifier.height(4.dp))
+                                Text("${inputBarcode.trim().uppercase()} is already inside Box ${boxDetail?.barcode ?: boxId}.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                            }
+                        }
+                    } else if (isBoxFull) {
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text("⚠ Box Full", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onErrorContainer)
+                                Spacer(Modifier.height(4.dp))
+                                Text("Box ${boxDetail?.barcode ?: boxId} has reached its maximum capacity of ${boxDetail?.capacity ?: 25} files. ${if (inputBarcode.isNotBlank()) "File ${inputBarcode.trim().uppercase()} cannot be inserted." else ""}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                            }
+                        }
+                    }
+
+                    if (inputBarcode.isNotBlank() && !isDuplicateSameBox) {
                         Card(
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.primaryContainer
                             ),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text("Scanned File:", style = MaterialTheme.typography.labelSmall)
+                            Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Scanned File Barcode:", style = MaterialTheme.typography.labelSmall)
                                 Text(
                                     inputBarcode,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold
+                                )
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                                Text(
+                                    "Target Box: ${boxDetail?.barcode ?: boxId}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
@@ -129,7 +172,7 @@ fun BoxDetailScreen(
                 Button(
                     onClick = {
                         val cleanCode = inputBarcode.trim().uppercase()
-                        if (cleanCode.isNotBlank()) {
+                        if (cleanCode.isNotBlank() && !isDuplicateSameBox && !isBoxFull) {
                             isInserting = true
                             insertStatusMessage = null
                             viewModel.insertFile(
@@ -139,6 +182,15 @@ fun BoxDetailScreen(
                             ) { success, msg ->
                                 isInserting = false
                                 if (success) {
+                                    val targetBoxLabel = boxDetail?.barcode ?: boxId
+                                    val successToastMsg = "✓ File inserted successfully\n$cleanCode has been inserted into Box $targetBoxLabel"
+                                    android.widget.Toast.makeText(context, successToastMsg, android.widget.Toast.LENGTH_LONG).show()
+                                    scope.launch {
+                                        snackbarHostState.showSnackbar(
+                                            message = "✓ File inserted successfully: $cleanCode → $targetBoxLabel",
+                                            duration = SnackbarDuration.Short
+                                        )
+                                    }
                                     showInsertDialog = false
                                     inputBarcode = ""
                                     insertStatusMessage = null
@@ -148,7 +200,7 @@ fun BoxDetailScreen(
                             }
                         }
                     },
-                    enabled = inputBarcode.isNotBlank() && !isInserting
+                    enabled = inputBarcode.isNotBlank() && !isInserting && !isDuplicateSameBox && !isBoxFull
                 ) {
                     if (isInserting) {
                         CircularProgressIndicator(
@@ -157,7 +209,13 @@ fun BoxDetailScreen(
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
-                        Text("Confirm Insert")
+                        Text(
+                            when {
+                                isDuplicateSameBox -> "Already Added"
+                                isBoxFull -> "Box Full"
+                                else -> "Confirm Insert"
+                            }
+                        )
                     }
                 }
             },
@@ -177,6 +235,7 @@ fun BoxDetailScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Box Detail") },
@@ -232,11 +291,12 @@ fun BoxDetailScreen(
                             Divider()
                             
                             DetailItem("Box Type", currentDetail.boxType)
-                            DetailItem("Status", currentDetail.status.name)
+                            DetailItem("Status", if (currentDetail.availableSlots <= 0) "FULL" else currentDetail.status.name)
                             DetailItem("Warehouse", currentDetail.warehouse)
                             DetailItem("Site", currentDetail.site)
                             DetailItem("Location", currentDetail.location)
-                            DetailItem("Files", currentDetail.fileCount.toString())
+                            DetailItem("Files", "${currentDetail.fileCount} / ${currentDetail.capacity}")
+                            DetailItem("Available Slots", currentDetail.availableSlots.toString())
                             if (currentDetail.lastActivity != null) {
                                 DetailItem("Last Activity", currentDetail.lastActivity)
                             }
@@ -419,7 +479,7 @@ fun BoxDetailScreen(
                     }
                 } else {
                     items(currentDetail.contents) { file ->
-                        FileCard(file)
+                        FileCard(file = file, onClick = { onOnFileClick(file.barcode) })
                     }
                 }
             }
@@ -519,8 +579,14 @@ private fun StatusBadge(status: BoxStatus) {
 }
 
 @Composable
-private fun FileCard(file: com.tionix.rms.feature.search.domain.model.FileRecord) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun FileCard(
+    file: com.tionix.rms.feature.search.domain.model.FileRecord,
+    onClick: () -> Unit = {}
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick
+    ) {
         Row(
             modifier = Modifier.padding(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -554,6 +620,12 @@ private fun FileCard(file: com.tionix.rms.feature.search.domain.model.FileRecord
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

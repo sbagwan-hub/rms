@@ -26,6 +26,7 @@ class AppSettingsStore @Inject constructor(
     companion object {
         private val KEY_SYNC_ON_CELLULAR = booleanPreferencesKey("sync_on_cellular")
         private val KEY_SERVER_URL = stringPreferencesKey("server_url")
+        private val KEY_SOUND_MUTED = booleanPreferencesKey("sound_muted")
     }
 
     val syncOnCellularFlow: Flow<Boolean> = dataStore.data.map { prefs ->
@@ -36,11 +37,18 @@ class AppSettingsStore @Inject constructor(
         prefs[KEY_SERVER_URL] ?: BuildConfig.API_BASE_URL
     }
 
+    val soundMutedFlow: Flow<Boolean> = dataStore.data.map { prefs ->
+        prefs[KEY_SOUND_MUTED] ?: false
+    }
+
     suspend fun isSyncOnCellular(): Boolean =
         dataStore.data.map { it[KEY_SYNC_ON_CELLULAR] ?: false }.first()
 
     suspend fun getServerUrl(): String =
         dataStore.data.map { it[KEY_SERVER_URL] ?: BuildConfig.API_BASE_URL }.first()
+
+    suspend fun isSoundMuted(): Boolean =
+        dataStore.data.map { it[KEY_SOUND_MUTED] ?: false }.first()
 
     suspend fun setSyncOnCellular(enabled: Boolean) {
         dataStore.edit { it[KEY_SYNC_ON_CELLULAR] = enabled }
@@ -48,5 +56,9 @@ class AppSettingsStore @Inject constructor(
 
     suspend fun setServerUrl(url: String) {
         dataStore.edit { it[KEY_SERVER_URL] = url }
+    }
+
+    suspend fun setSoundMuted(muted: Boolean) {
+        dataStore.edit { it[KEY_SOUND_MUTED] = muted }
     }
 }

@@ -6,6 +6,12 @@ import com.tionix.rms.feature.filesearch.domain.model.MovementEvent
 import com.tionix.rms.feature.filesearch.domain.model.MovementType
 import com.tionix.rms.feature.filesearch.domain.model.ParentBox
 
+data class FileDetailResponseEnvelope(
+    val success: Boolean = true,
+    val message: String? = null,
+    val data: FileDetailDto? = null
+)
+
 data class FileDetailDto(
     val id: String,
     val barcode: String,
@@ -47,7 +53,7 @@ fun FileDetailDto.toDomain(): FileDetail = FileDetail(
     ),
     locationChain = locationChain,
     status = when (status.uppercase()) {
-        "ACTIVE" -> FileStatus.ACTIVE
+        "ACTIVE", "IN_BOX" -> FileStatus.ACTIVE
         "CHECKED_OUT" -> FileStatus.CHECKED_OUT
         "ARCHIVED" -> FileStatus.ARCHIVED
         "LOST" -> FileStatus.LOST

@@ -148,8 +148,13 @@ fun RmsNavGraph() {
                 SearchScreen(
                     onBack = { navController.popBackStack() },
                     onResultClick = { result ->
-                        if (result is com.tionix.rms.feature.search.domain.model.SearchResult.BoxResult) {
-                            navController.navigate(RmsRoutes.boxDetail(result.id))
+                        when (result) {
+                            is com.tionix.rms.feature.search.domain.model.SearchResult.BoxResult -> {
+                                navController.navigate(RmsRoutes.boxDetail(result.id))
+                            }
+                            is com.tionix.rms.feature.search.domain.model.SearchResult.FileRecordResult -> {
+                                navController.navigate(RmsRoutes.fileDetail(result.barcode))
+                            }
                         }
                     }
                 )
@@ -160,7 +165,7 @@ fun RmsNavGraph() {
                     onBack = { navController.popBackStack() },
                     onResultClick = { result ->
                         if (result is com.tionix.rms.feature.search.domain.model.SearchResult.FileRecordResult) {
-                            navController.navigate(RmsRoutes.fileDetail(result.id))
+                            navController.navigate(RmsRoutes.fileDetail(result.barcode))
                         }
                     }
                 )
@@ -174,8 +179,9 @@ fun RmsNavGraph() {
                 BoxDetailScreen(
                     boxId = boxId,
                     onBack = { navController.popBackStack() },
-                    onNavigateToTransfer = { /* Navigate to Transfer with boxId */ },
-                    onNavigateToRefile = { /* Navigate to Refile with boxId */ },
+                    onNavigateToTransfer = { navController.navigate(RmsRoutes.TRANSFER) },
+                    onNavigateToRefile = { navController.navigate(RmsRoutes.REFILE) },
+                    onOnFileClick = { fileBarcode -> navController.navigate(RmsRoutes.fileDetail(fileBarcode)) },
                     canTransfer = false,
                     canRefile = true
                 )
@@ -189,13 +195,27 @@ fun RmsNavGraph() {
                 FileDetailScreen(
                     fileId = fileId,
                     onBack = { navController.popBackStack() },
-                    onNavigateToRefile = { /* Navigate to Refile with fileId */ },
+                    onNavigateToRefile = { navController.navigate(RmsRoutes.REFILE) },
                     canRefile = true
                 )
             }
 
             composable(RmsRoutes.HISTORY) {
-                HistoryScreen(onBack = { navController.popBackStack() })
+                HistoryScreen(
+                    onBack = { navController.popBackStack() },
+                    onBoxClick = { boxId ->
+                        navController.navigate(RmsRoutes.boxDetail(boxId))
+                    },
+                    onFileClick = { fileId ->
+                        navController.navigate(RmsRoutes.fileDetail(fileId))
+                    },
+                    onRefileClick = {
+                        navController.navigate(RmsRoutes.REFILE)
+                    },
+                    onTransferClick = {
+                        navController.navigate(RmsRoutes.TRANSFER)
+                    }
+                )
             }
 
             composable(RmsRoutes.SETTINGS) {

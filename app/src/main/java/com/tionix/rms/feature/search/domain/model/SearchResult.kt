@@ -29,6 +29,8 @@ data class BoxDetail(
     val location: String,
     val status: BoxStatus,
     val fileCount: Int,
+    val capacity: Int = 50,
+    val availableSlots: Int = 50,
     val lastActivity: String?,
     val contents: List<FileRecord>,
     val clientId: String,

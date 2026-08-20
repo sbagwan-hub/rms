@@ -24,6 +24,7 @@ class SettingsRepositoryImpl @Inject constructor(
         return Result.success(
             Settings(
                 syncOnCellular = appSettingsStore.isSyncOnCellular(),
+                soundMuted = appSettingsStore.isSoundMuted(),
                 serverUrl = appSettingsStore.getServerUrl(),
                 scannerModeLabel = if (mode == ScannerAvailability.Mode.HONEYWELL_IMAGER) {
                     "Honeywell Imager"
@@ -36,6 +37,11 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun updateSyncOnCellular(enabled: Boolean): Result<Unit> {
         appSettingsStore.setSyncOnCellular(enabled)
+        return Result.success(Unit)
+    }
+
+    override suspend fun updateSoundMuted(muted: Boolean): Result<Unit> {
+        appSettingsStore.setSoundMuted(muted)
         return Result.success(Unit)
     }
 

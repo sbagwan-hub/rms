@@ -14,5 +14,9 @@ data class SyncedOperationItem(
     val status: String,
     val performedAt: String,
     val summary: String,
-    val reasonCode: String?
+    val reasonCode: String?,
+    val boxId: String? = null,
+    val boxBarcode: String? = null,
+    val fileId: String? = null,
+    val fileBarcode: String? = null
 )

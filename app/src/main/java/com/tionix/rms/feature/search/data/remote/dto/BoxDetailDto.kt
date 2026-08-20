@@ -14,6 +14,8 @@ data class BoxDetailDto(
     val location: String,
     val status: String,
     val fileCount: Int,
+    val capacity: Int? = 50,
+    val availableSlots: Int? = 50,
     val lastActivity: String?,
     val contents: List<FileRecordDto>,
     val clientId: String,
@@ -43,6 +45,8 @@ fun BoxDetailDto.toDomain(): BoxDetail = BoxDetail(
         else -> BoxStatus.ACTIVE
     },
     fileCount = fileCount,
+    capacity = capacity ?: 50,
+    availableSlots = availableSlots ?: Math.max(0, (capacity ?: 50) - fileCount),
     lastActivity = lastActivity,
     contents = contents.map {
         FileRecord(

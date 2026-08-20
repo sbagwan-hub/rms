@@ -21,14 +21,39 @@ interface SearchApiService {
     suspend fun getBoxDetail(@Path("id") boxId: String): Response<BoxDetailDto>
 
     @GET("search/files/{id}")
-    suspend fun getFileDetail(@Path("id") fileId: String): Response<com.tionix.rms.feature.filesearch.data.remote.dto.FileDetailDto>
+    suspend fun getFileDetail(@Path("id") fileId: String): Response<com.tionix.rms.feature.filesearch.data.remote.dto.FileDetailResponseEnvelope>
 
     @retrofit2.http.POST("search/boxes/{id}/files")
     suspend fun insertFile(
         @Path("id") boxId: String,
         @retrofit2.http.Body request: InsertFileRequest
     ): Response<InsertFileResponse>
+
+    @retrofit2.http.POST("search/refile")
+    suspend fun refileFile(
+        @retrofit2.http.Body request: RefileRequest
+    ): Response<RefileResponse>
 }
+
+data class RefileRequest(
+    val fileBarcode: String,
+    val targetBoxBarcode: String
+)
+
+data class RefileResponse(
+    val success: Boolean = true,
+    val message: String? = null,
+    val data: RefileData? = null
+)
+
+data class RefileData(
+    val fileId: String,
+    val fileBarcode: String,
+    val sourceBoxId: String,
+    val sourceBoxBarcode: String,
+    val targetBoxId: String,
+    val targetBoxBarcode: String
+)
 
 data class InsertFileRequest(
     val fileBarcode: String,
@@ -36,9 +61,13 @@ data class InsertFileRequest(
 )
 
 data class InsertFileResponse(
-    val success: Boolean,
+    val success: Boolean = true,
     val message: String? = null,
-    val data: InsertFileData? = null
+    val data: InsertFileData? = null,
+    val id: String? = null,
+    val barcode: String? = null,
+    val boxId: String? = null,
+    val boxBarcode: String? = null
 )
 
 data class InsertFileData(

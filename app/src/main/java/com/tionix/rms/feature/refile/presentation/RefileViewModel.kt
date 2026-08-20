@@ -204,6 +204,9 @@ class RefileViewModel @Inject constructor(
                 _sessionActions.value = _sessionActions.value + action
                 beepPlayer.positive()
                 
+                val fromBoxBarcode = action.sourceBox.barcode
+                val toBoxBarcode = action.destinationBox.barcode
+
                 if (_batchMode.value) {
                     // Clear for next scan in batch mode and reset to file scanning step
                     _currentFile.value = null
@@ -211,7 +214,12 @@ class RefileViewModel @Inject constructor(
                     _destinationBoxBarcode.value = ""
                     scanStep = ScanStep.FILE
                 } else {
-                    _uiState.value = RefileUiState.RefileCompleted
+                    _uiState.value = RefileUiState.RefileSuccess(
+                        message = "File $fileBarcode refiled successfully",
+                        fileBarcode = fileBarcode,
+                        fromBox = fromBoxBarcode,
+                        toBox = toBoxBarcode
+                    )
                 }
             } else {
                 _showMismatchDialog.value = true

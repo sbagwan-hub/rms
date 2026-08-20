@@ -57,14 +57,13 @@ object NetworkModule {
             val token = kotlinx.coroutines.runBlocking {
                 preferences.getAccessToken()
             }
-            val request = if (token.isNullOrBlank()) {
-                chain.request()
-            } else {
-                chain.request().newBuilder()
-                    .addHeader("Authorization", "Bearer $token")
-                    .build()
+            val requestBuilder = chain.request().newBuilder()
+                .header("Connection", "close")
+
+            if (!token.isNullOrBlank()) {
+                requestBuilder.header("Authorization", "Bearer $token")
             }
-            chain.proceed(request)
+            chain.proceed(requestBuilder.build())
         }
 
     @Provides
@@ -83,6 +82,8 @@ object NetworkModule {
             .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
             .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
             .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
+            .connectionPool(okhttp3.ConnectionPool(5, 10, java.util.concurrent.TimeUnit.SECONDS))
             .addInterceptor(authInterceptor)
             .addInterceptor(EnvelopeUnwrappingInterceptor())
             .addInterceptor(logging)

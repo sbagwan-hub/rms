@@ -44,8 +44,8 @@ class FileSearchRepositoryImpl @Inject constructor(
     override suspend fun getFileDetail(fileId: String): Result<FileDetail> {
         return try {
             val response = apiService.getFileDetail(fileId)
-            if (response.isSuccessful && response.body() != null) {
-                Result.success(response.body()!!.toDomain())
+            if (response.isSuccessful && response.body()?.data != null) {
+                Result.success(response.body()!!.data!!.toDomain())
             } else {
                 Result.failure(Exception("Failed to load file details"))
             }

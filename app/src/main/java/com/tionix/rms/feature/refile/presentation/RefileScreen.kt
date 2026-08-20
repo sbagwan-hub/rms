@@ -158,8 +158,12 @@ fun RefileScreen(
                                         text = "Current Box: ${file.currentBox.barcode}",
                                         style = MaterialTheme.typography.bodySmall
                                     )
+                                    val locText = listOfNotNull(
+                                        file.currentLocation.room.takeIf { it.isNotBlank() },
+                                        file.currentLocation.name.takeIf { it.isNotBlank() }
+                                    ).joinToString(" - ").ifBlank { "Unassigned" }
                                     Text(
-                                        text = "Current Location: ${file.currentLocation.room} - ${file.currentLocation.name}",
+                                        text = "Current Location: $locText",
                                         style = MaterialTheme.typography.bodySmall
                                     )
                                 }
@@ -331,6 +335,38 @@ fun RefileScreen(
                                     Text(
                                         text = state.message,
                                         color = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    is RefileUiState.RefileSuccess -> {
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color(0xFFE8F5E9)
+                                )
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = "✓ ${state.message}",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF2E7D32)
+                                    )
+                                    Text(
+                                        text = "From: ${state.fromBox}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFF1B5E20)
+                                    )
+                                    Text(
+                                        text = "To: ${state.toBox}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFF1B5E20)
                                     )
                                 }
                             }

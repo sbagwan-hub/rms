@@ -20,6 +20,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    private val repository: com.tionix.rms.feature.settings.domain.repository.SettingsRepository,
     private val getSettingsUseCase: GetSettingsUseCase,
     private val updateSyncOnCellularUseCase: UpdateSyncOnCellularUseCase,
     private val updateServerUrlUseCase: UpdateServerUrlUseCase,
@@ -66,6 +67,16 @@ class SettingsViewModel @Inject constructor(
                 }
                 .onFailure { error ->
                     _message.value = error.message ?: "Failed to update sync preference"
+                }
+        }
+    }
+
+    fun updateSoundMuted(muted: Boolean) {
+        viewModelScope.launch {
+            repository.updateSoundMuted(muted)
+                .onSuccess { loadSettings() }
+                .onFailure { error ->
+                    _message.value = error.message ?: "Failed to update sound preference"
                 }
         }
     }

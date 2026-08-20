@@ -61,15 +61,22 @@ class SearchRepositoryImpl @Inject constructor(
                     title = title
                 )
             )
-            if (response.isSuccessful && response.body()?.success == true) {
-                Result.success(response.body()?.message ?: "File inserted successfully")
+            if (response.isSuccessful) {
+                val resBody = response.body()
+                val successMessage = resBody?.message ?: "File inserted successfully"
+                Result.success(successMessage)
             } else {
                 val errorBodyStr = response.errorBody()?.string()
                 val serverMsg = try {
                     if (!errorBodyStr.isNullOrBlank()) {
                         val json = com.google.gson.JsonParser.parseString(errorBodyStr).asJsonObject
-                        if (json.has("error") && json.get("error").isJsonObject) {
-                            json.getAsJsonObject("error").get("message")?.asString
+                        if (json.has("error")) {
+                            val errElem = json.get("error")
+                            if (errElem.isJsonObject) {
+                                errElem.asJsonObject.get("message")?.asString
+                            } else if (errElem.isJsonPrimitive) {
+                                errElem.asString
+                            } else null
                         } else if (json.has("message")) {
                             json.get("message")?.asString
                         } else null
@@ -77,10 +84,19 @@ class SearchRepositoryImpl @Inject constructor(
                 } catch (ex: Exception) {
                     null
                 }
-                Result.failure(Exception(serverMsg ?: response.body()?.message ?: "Failed to insert file"))
+
+                val finalError = when (response.code()) {
+                    404 -> serverMsg ?: "File barcode or Box was not found."
+                    409 -> serverMsg ?: "File insertion conflict or warehouse mismatch."
+                    401 -> "Authentication expired. Please log in again."
+                    else -> serverMsg ?: "Failed to insert file"
+                }
+                Result.failure(Exception(finalError))
             }
         } catch (e: Exception) {
-            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
+            val msg = e.localizedMessage
+            val friendlyMsg = if (!msg.isNullOrBlank() && !msg.contains("Exception") && !msg.contains("java.")) msg else ErrorUtils.getFriendlyErrorMessage(e)
+            Result.failure(Exception(friendlyMsg))
         }
     }
 }

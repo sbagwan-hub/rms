@@ -9,8 +9,26 @@ import com.tionix.rms.feature.refile.domain.repository.RefileRepository
 import javax.inject.Inject
 
 class RefileRepositoryImpl @Inject constructor(
-    private val apiService: RefileApiService
+    private val apiService: RefileApiService,
+    private val searchApiService: com.tionix.rms.feature.search.data.remote.SearchApiService
 ) : RefileRepository {
+
+    private fun parseErrorMessage(response: retrofit2.Response<*>): String {
+        return try {
+            val errorBody = response.errorBody()?.string()
+            if (!errorBody.isNullOrEmpty()) {
+                val json = org.json.JSONObject(errorBody)
+                if (json.has("error")) {
+                    val errObj = json.getJSONObject("error")
+                    errObj.optString("message", "")
+                } else {
+                    json.optString("message", "")
+                }
+            } else ""
+        } catch (e: Exception) {
+            ""
+        }
+    }
 
     override suspend fun getAssignedRefiles(): Result<List<Refile>> {
         return try {
@@ -53,34 +71,35 @@ class RefileRepositoryImpl @Inject constructor(
 
     override suspend fun scanFile(barcode: String): Result<FileRecord> {
         return try {
-            val response = apiService.scanFile(barcode)
-            if (response.isSuccessful && response.body() != null) {
-                val dto = response.body()!!
+            val response = searchApiService.getFileDetail(barcode)
+            if (response.isSuccessful && response.body()?.data != null) {
+                val detail = response.body()!!.data!!
                 val location = Location(
-                    id = dto.id,
-                    barcode = dto.currentLocation,
-                    name = dto.currentLocation,
+                    id = if (detail.parentBox.id.isNotBlank()) detail.parentBox.id else detail.id,
+                    barcode = detail.parentBox.location,
+                    name = detail.parentBox.location,
                     room = "",
                     rack = "",
                     shelf = "",
                     type = LocationType.LOCATION
                 )
                 val box = Box(
-                    id = dto.id,
-                    barcode = dto.currentLocation,
-                    description = "Box ${dto.currentLocation}",
+                    id = detail.parentBox.id,
+                    barcode = detail.parentBox.barcode,
+                    description = detail.parentBox.name ?: "Box ${detail.parentBox.barcode}",
                     location = location
                 )
                 val fileRecord = FileRecord(
-                    id = dto.id,
-                    barcode = dto.fileBarcode,
-                    title = dto.fileName ?: "File ${dto.fileBarcode}",
+                    id = detail.id,
+                    barcode = detail.barcode,
+                    title = detail.title,
                     currentBox = box,
                     currentLocation = location
                 )
                 Result.success(fileRecord)
             } else {
-                Result.failure(Exception("File $barcode not found"))
+                val errorMsg = parseErrorMessage(response)
+                Result.failure(Exception(if (errorMsg.isNotBlank()) errorMsg else "File barcode $barcode is not registered. Please register the file before refiling."))
             }
         } catch (e: Exception) {
             Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
@@ -97,18 +116,16 @@ class RefileRepositoryImpl @Inject constructor(
         destinationBoxBarcode: String
     ): Result<RefileAction> {
         return try {
-            val startRes = apiService.startRefile(
-                com.tionix.rms.feature.refile.data.remote.dto.StartRefileRequestDto(
+            val response = searchApiService.refileFile(
+                com.tionix.rms.feature.search.data.remote.RefileRequest(
                     fileBarcode = fileBarcode,
-                    newLocation = destinationBoxBarcode,
-                    reason = "Refile"
+                    targetBoxBarcode = destinationBoxBarcode
                 )
             )
-            if (startRes.isSuccessful && startRes.body() != null) {
-                val dto = startRes.body()!!
-                apiService.completeRefile(dto.id)
+            if (response.isSuccessful && response.body()?.success == true) {
+                val data = response.body()?.data
                 val location = Location(
-                    id = dto.id,
+                    id = data?.targetBoxId ?: destinationBoxBarcode,
                     barcode = destinationBoxBarcode,
                     name = destinationBoxBarcode,
                     room = "",
@@ -116,11 +133,11 @@ class RefileRepositoryImpl @Inject constructor(
                     shelf = "",
                     type = LocationType.LOCATION
                 )
-                val srcBox = Box(id = dto.id, barcode = dto.currentLocation, description = "Source Box", location = location)
-                val dstBox = Box(id = destinationBoxBarcode, barcode = destinationBoxBarcode, description = "Destination Box $destinationBoxBarcode", location = location)
-                val file = FileRecord(id = dto.id, barcode = fileBarcode, title = dto.fileName ?: "File $fileBarcode", currentBox = srcBox, currentLocation = location)
+                val srcBox = Box(id = data?.sourceBoxId ?: "", barcode = data?.sourceBoxBarcode ?: "Unassigned", description = "Source Box", location = location)
+                val dstBox = Box(id = data?.targetBoxId ?: destinationBoxBarcode, barcode = data?.targetBoxBarcode ?: destinationBoxBarcode, description = "Destination Box $destinationBoxBarcode", location = location)
+                val file = FileRecord(id = data?.fileId ?: fileBarcode, barcode = fileBarcode, title = "File $fileBarcode", currentBox = dstBox, currentLocation = location)
                 val action = RefileAction(
-                    id = dto.id,
+                    id = data?.fileId ?: fileBarcode,
                     fileRecord = file,
                     sourceBox = srcBox,
                     destinationBox = dstBox,
@@ -132,7 +149,8 @@ class RefileRepositoryImpl @Inject constructor(
                 )
                 Result.success(action)
             } else {
-                Result.failure(Exception("Failed to confirm refile on server"))
+                val errorMsg = parseErrorMessage(response)
+                Result.failure(Exception(if (errorMsg.isNotBlank()) errorMsg else "Refile failed"))
             }
         } catch (e: Exception) {
             Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))

@@ -1,8 +1,9 @@
 package com.tionix.rms.feature.dashboard.presentation
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -13,8 +14,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -28,7 +29,6 @@ import com.tionix.rms.feature.dashboard.domain.model.TaskType
 private val SuccessGreen = Color(0xFF16A34A)
 private val WarningAmber = Color(0xFFF59E0B)
 private val ErrorRose = Color(0xFFDC2626)
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +63,19 @@ fun DashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Dashboard", fontWeight = FontWeight.Bold) },
+                title = {
+                    Column {
+                        Text(
+                            "RMS Operations",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            "Warehouse Dashboard & Workflows",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 actions = {
                     IconButton(onClick = { viewModel.refresh() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh")
@@ -73,9 +85,7 @@ fun DashboardScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground,
-                    actionIconContentColor = MaterialTheme.colorScheme.onBackground
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -96,9 +106,13 @@ fun DashboardScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
-                        .padding(16.dp),
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    // 1. METRICS OVERVIEW
+                    item {
+                        DashboardSectionHeader(title = "Key Metrics", icon = Icons.Default.BarChart)
+                    }
                     item {
                         StatsGrid(stats = state.stats)
                     }
@@ -117,20 +131,16 @@ fun DashboardScreen(
                             ReportsSummaryCard(summary = state.reportsSummary)
                         }
                     }
-                    
+
+                    // 2. WORKFLOWS GRID
                     item {
-                        Text(
-                            text = "Barcode Scan Workflows",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                        DashboardSectionHeader(title = "Barcode Scan Workflows", icon = Icons.Default.QrCodeScanner)
                     }
-                    
                     item {
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 WorkflowCard(
                                     title = "Fresh Box Move",
@@ -175,10 +185,10 @@ fun DashboardScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                             }
-                            
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 WorkflowCard(
                                     title = "Segregation",
@@ -223,10 +233,10 @@ fun DashboardScreen(
                                     modifier = Modifier.weight(1f)
                                 )
                             }
-                            
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 WorkflowCard(
                                     title = "Transfer",
@@ -273,29 +283,29 @@ fun DashboardScreen(
                             }
                         }
                     }
-                    
+
+                    // 3. ASSIGNED TASKS
                     item {
-                        Text(
-                            text = "Assigned Tasks",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                        DashboardSectionHeader(title = "Assigned Tasks", icon = Icons.Default.Assignment)
                     }
-                    
+
                     if (state.tasks.isEmpty()) {
                         item {
-                            Card(
-                                modifier = Modifier.fillMaxWidth()
+                            OutlinedCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                                colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
                             ) {
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(32.dp),
+                                        .padding(28.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
                                         text = "No tasks assigned",
-                                        style = MaterialTheme.typography.bodyLarge,
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 }
@@ -310,6 +320,7 @@ fun DashboardScreen(
                         }
                     }
 
+                    // 4. QUICK FOOTER ACTIONS
                     item {
                         DashboardFooter(
                             pendingSyncCount = pendingSyncCount,
@@ -317,6 +328,10 @@ fun DashboardScreen(
                             onHistory = onHistory,
                             onProfile = onProfile
                         )
+                    }
+
+                    item {
+                        Spacer(Modifier.height(24.dp))
                     }
                 }
             }
@@ -350,8 +365,28 @@ fun DashboardScreen(
             }
         }
     }
+}
 
-
+@Composable
+private fun DashboardSectionHeader(title: String, icon: ImageVector) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
+        Text(
+            title,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
 }
 
 @Composable
@@ -365,7 +400,7 @@ private fun PendingSyncBanner(
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         color = WarningAmber.copy(alpha = 0.15f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, WarningAmber.copy(alpha = 0.4f))
+        border = BorderStroke(1.dp, WarningAmber.copy(alpha = 0.4f))
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -385,15 +420,17 @@ private fun PendingSyncBanner(
 
 @Composable
 private fun ReportsSummaryCard(summary: ReportsSummary) {
-    Card(
+    OutlinedCard(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("Today's summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("Today's Summary", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -427,7 +464,7 @@ private fun DashboardFooter(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        OutlinedButton(onClick = onSearch, modifier = Modifier.weight(1f)) {
+        OutlinedButton(onClick = onSearch, modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp)) {
             Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
             Text("Search")
@@ -440,13 +477,13 @@ private fun DashboardFooter(
             },
             modifier = Modifier.weight(1f)
         ) {
-            OutlinedButton(onClick = onHistory, modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = onHistory, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
                 Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(4.dp))
                 Text("History")
             }
         }
-        OutlinedButton(onClick = onProfile, modifier = Modifier.weight(1f)) {
+        OutlinedButton(onClick = onProfile, modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp)) {
             Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(4.dp))
             Text("Profile")
@@ -456,10 +493,10 @@ private fun DashboardFooter(
 
 @Composable
 private fun StatsGrid(stats: com.tionix.rms.feature.dashboard.domain.model.DashboardStats) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             StatCard(
                 title = "Total Tasks",
@@ -478,7 +515,7 @@ private fun StatsGrid(stats: com.tionix.rms.feature.dashboard.domain.model.Dashb
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             StatCard(
                 title = "In Progress",
@@ -497,7 +534,7 @@ private fun StatsGrid(stats: com.tionix.rms.feature.dashboard.domain.model.Dashb
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             StatCard(
                 title = "Urgent",
@@ -521,32 +558,37 @@ private fun StatsGrid(stats: com.tionix.rms.feature.dashboard.domain.model.Dashb
 private fun StatCard(
     title: String,
     value: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     color: Color,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier
-            .border(
-                width = 1.dp,
-                color = color.copy(alpha = 0.2f),
-                shape = RoundedCornerShape(14.dp)
-            ),
+    OutlinedCard(
+        modifier = modifier,
         shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(
+        border = BorderStroke(1.dp, color.copy(alpha = 0.3f)),
+        colors = CardDefaults.outlinedCardColors(
             containerColor = MaterialTheme.colorScheme.surface
-        )
+        ),
+        elevation = CardDefaults.outlinedCardElevation(defaultElevation = 1.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(24.dp)
-            )
+            Surface(
+                color = color.copy(alpha = 0.15f),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.size(32.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
             Text(
                 text = value,
                 style = MaterialTheme.typography.headlineMedium,
@@ -574,17 +616,12 @@ private fun TaskCard(
         TaskPriority.URGENT -> ErrorRose
     }
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
-                shape = RoundedCornerShape(14.dp)
-            ),
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
         onClick = onClick,
-        colors = CardDefaults.cardColors(
+        colors = CardDefaults.outlinedCardColors(
             containerColor = MaterialTheme.colorScheme.surface
         )
     ) {
@@ -592,7 +629,6 @@ private fun TaskCard(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Priority Indicator Strip
             Box(
                 modifier = Modifier
                     .width(6.dp)
@@ -606,7 +642,7 @@ private fun TaskCard(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(16.dp),
+                    .padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(
@@ -657,11 +693,11 @@ private fun StatusBadge(status: TaskStatus) {
         TaskStatus.COMPLETED -> SuccessGreen to "Completed"
         TaskStatus.FAILED -> MaterialTheme.colorScheme.error to "Failed"
     }
-    
+
     Surface(
         color = color.copy(alpha = 0.15f),
         shape = RoundedCornerShape(8.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.3f))
+        border = BorderStroke(1.dp, color.copy(alpha = 0.3f))
     ) {
         Text(
             text = label,
@@ -683,11 +719,11 @@ private fun TypeBadge(type: TaskType) {
         TaskType.MERGE -> "Merge"
         TaskType.TRANSFER -> "Transfer"
     }
-    
+
     Surface(
-        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
         shape = RoundedCornerShape(8.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
     ) {
         Text(
             text = label,
@@ -707,11 +743,11 @@ private fun PriorityBadge(priority: TaskPriority) {
         TaskPriority.HIGH -> WarningAmber to "High"
         TaskPriority.URGENT -> ErrorRose to "Urgent"
     }
-    
+
     Surface(
         color = color.copy(alpha = 0.15f),
         shape = RoundedCornerShape(8.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.3f))
+        border = BorderStroke(1.dp, color.copy(alpha = 0.3f))
     ) {
         Text(
             text = label,
@@ -726,17 +762,20 @@ private fun PriorityBadge(priority: TaskPriority) {
 @Composable
 private fun WorkflowCard(
     title: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     description: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Card(
+    OutlinedCard(
         onClick = onClick,
         modifier = modifier.height(112.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = MaterialTheme.colorScheme.surface
+        ),
+        elevation = CardDefaults.outlinedCardElevation(defaultElevation = 1.dp)
     ) {
         Column(
             modifier = Modifier
@@ -749,20 +788,28 @@ private fun WorkflowCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = title,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp)
-                )
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = title,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    modifier = Modifier.size(16.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             }
-            Column {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,

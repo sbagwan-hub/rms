@@ -22,10 +22,24 @@ class DashboardRepositoryImpl @Inject constructor(
             if (response.isSuccessful && response.body() != null) {
                 Result.success(response.body()!!.toDomain())
             } else {
-                Result.failure(Exception("Failed to fetch dashboard stats"))
+                val errBody = response.errorBody()?.string()
+                val serverMsg = try {
+                    if (!errBody.isNullOrBlank()) {
+                        val json = com.google.gson.JsonParser.parseString(errBody).asJsonObject
+                        if (json.has("error")) {
+                            val errElem = json.get("error")
+                            if (errElem.isJsonObject) errElem.asJsonObject.get("message")?.asString
+                            else if (errElem.isJsonPrimitive) errElem.asString
+                            else null
+                        } else json.get("message")?.asString
+                    } else null
+                } catch (e: Exception) { null }
+                Result.failure(Exception(serverMsg ?: "Failed to fetch dashboard stats (HTTP ${response.code()})"))
             }
         } catch (e: Exception) {
-            Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
+            val msg = e.localizedMessage
+            val friendlyMsg = if (!msg.isNullOrBlank() && !msg.contains("Exception") && !msg.contains("java.")) msg else ErrorUtils.getFriendlyErrorMessage(e)
+            Result.failure(Exception(friendlyMsg))
         }
     }
 

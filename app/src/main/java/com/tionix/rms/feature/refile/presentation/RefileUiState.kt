@@ -10,6 +10,7 @@ sealed class RefileUiState {
     data class FileScanned(val fileRecord: FileRecord?) : RefileUiState()
     object RefileStarted : RefileUiState()
     object RefileCompleted : RefileUiState()
+    data class RefileSuccess(val message: String, val fileBarcode: String, val fromBox: String, val toBox: String) : RefileUiState()
     object SessionStarted : RefileUiState()
     object SessionEnded : RefileUiState()
     data class MismatchDetected(val canOverride: Boolean) : RefileUiState()

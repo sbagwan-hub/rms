@@ -1,12 +1,15 @@
 package com.tionix.rms.feature.history.presentation
 
+import android.util.Log
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,10 +29,16 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private const val TAG = "HistoryScreen"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HistoryScreen(
     onBack: () -> Unit,
+    onBoxClick: (String) -> Unit = {},
+    onFileClick: (String) -> Unit = {},
+    onRefileClick: () -> Unit = {},
+    onTransferClick: () -> Unit = {},
     viewModel: HistoryViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -38,7 +47,19 @@ fun HistoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("History") },
+                title = {
+                    Column {
+                        Text(
+                            "History",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            "Operation Logs & Audit Trail",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -50,7 +71,10 @@ fun HistoryScreen(
                         Spacer(Modifier.width(4.dp))
                         Text("Sync now")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
         }
     ) { padding ->
@@ -88,7 +112,49 @@ fun HistoryScreen(
                     items = uiState.syncedOps,
                     loading = uiState.loadingSynced,
                     error = uiState.syncedError,
-                    onRetry = { viewModel.loadSynced() }
+                    onRetry = { viewModel.loadSynced() },
+                    onItemClick = { item ->
+                        val targetBoxId = item.boxId ?: item.boxBarcode
+                        val targetFileId = item.fileId ?: item.fileBarcode
+                        Log.d(TAG, "History click: id=${item.id}, type=${item.type}, boxId=$targetBoxId, fileId=$targetFileId")
+
+                        when (item.type.uppercase()) {
+                            "FRESH_BOX", "FRESH_BOX_MOVE", "INTAKE", "INVENTORY" -> {
+                                if (!targetBoxId.isNullOrBlank()) {
+                                    Log.d(TAG, "Navigating to BoxDetails: $targetBoxId")
+                                    onBoxClick(targetBoxId)
+                                }
+                            }
+                            "REFILE" -> {
+                                if (!targetFileId.isNullOrBlank()) {
+                                    Log.d(TAG, "Navigating to FileDetails: $targetFileId")
+                                    onFileClick(targetFileId)
+                                } else if (!targetBoxId.isNullOrBlank()) {
+                                    Log.d(TAG, "Navigating to BoxDetails: $targetBoxId")
+                                    onBoxClick(targetBoxId)
+                                } else {
+                                    onRefileClick()
+                                }
+                            }
+                            "TRANSFER" -> {
+                                if (!targetBoxId.isNullOrBlank()) {
+                                    Log.d(TAG, "Navigating to BoxDetails: $targetBoxId")
+                                    onBoxClick(targetBoxId)
+                                } else {
+                                    onTransferClick()
+                                }
+                            }
+                            else -> {
+                                if (!targetBoxId.isNullOrBlank()) {
+                                    Log.d(TAG, "Navigating to BoxDetails: $targetBoxId")
+                                    onBoxClick(targetBoxId)
+                                } else if (!targetFileId.isNullOrBlank()) {
+                                    Log.d(TAG, "Navigating to FileDetails: $targetFileId")
+                                    onFileClick(targetFileId)
+                                }
+                            }
+                        }
+                    }
                 )
             }
         }
@@ -119,7 +185,11 @@ private fun PendingTab(items: List<PendingOperationItem>) {
 @Composable
 private fun PendingOperationCard(item: PendingOperationItem) {
     val formatter = remember { SimpleDateFormat("MMM d, HH:mm", Locale.getDefault()) }
-    Card(modifier = Modifier.fillMaxWidth()) {
+    OutlinedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+    ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -173,7 +243,8 @@ private fun SyncedTab(
     items: List<SyncedOperationItem>,
     loading: Boolean,
     error: String?,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onItemClick: (SyncedOperationItem) -> Unit
 ) {
     when {
         loading -> LoadingState(modifier = Modifier.fillMaxSize())
@@ -195,18 +266,24 @@ private fun SyncedTab(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(items, key = { it.id }) { item ->
-                SyncedOperationCard(item)
+                SyncedOperationCard(item = item, onClick = { onItemClick(item) })
             }
         }
     }
 }
 
 @Composable
-private fun SyncedOperationCard(item: SyncedOperationItem) {
+private fun SyncedOperationCard(
+    item: SyncedOperationItem,
+    onClick: () -> Unit
+) {
     val isRejected = item.status.equals("REJECTED", ignoreCase = true)
-    Card(
+    OutlinedCard(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+        colors = CardDefaults.outlinedCardColors(
             containerColor = if (isRejected) {
                 MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f)
             } else {
@@ -214,38 +291,56 @@ private fun SyncedOperationCard(item: SyncedOperationItem) {
             }
         )
     ) {
-        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(item.type.replace('_', ' '), fontWeight = FontWeight.Bold)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        if (isRejected) Icons.Default.Sync else Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = if (isRejected) MaterialTheme.colorScheme.error else Color(0xFF16A34A),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Text(
-                        item.status,
-                        color = if (isRejected) MaterialTheme.colorScheme.error else Color(0xFF16A34A),
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.labelMedium
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(item.type.replace('_', ' '), fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            if (isRejected) Icons.Default.Sync else Icons.Default.CheckCircle,
+                            contentDescription = null,
+                            tint = if (isRejected) MaterialTheme.colorScheme.error else Color(0xFF16A34A),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            item.status,
+                            color = if (isRejected) MaterialTheme.colorScheme.error else Color(0xFF16A34A),
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+                Text(item.summary, style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    item.performedAt,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                item.reasonCode?.let {
+                    Text("Reason: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
             }
-            Text(item.summary, style = MaterialTheme.typography.bodyMedium)
-            Text(
-                item.performedAt,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = "Open Details",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                modifier = Modifier.size(20.dp)
             )
-            item.reasonCode?.let {
-                Text("Reason: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
-            }
         }
     }
 }
