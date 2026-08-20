@@ -75,15 +75,15 @@ class RefileViewModel @Inject constructor(
         // Collect scanner results for continuous scanning in both batch and normal modes
         viewModelScope.launch {
             scannerRepository.scanResults.collect { result ->
+                val cleanBarcode = result.barcode.trim().replace("\r", "").replace("\n", "").replace("\t", "")
                 if (_batchMode.value) {
-                    handleScannerResult(result.barcode)
+                    handleScannerResult(cleanBarcode)
                 } else {
-                    val barcode = result.barcode
                     if (_currentFile.value == null) {
-                        _scannedBarcode.value = barcode
+                        _scannedBarcode.value = cleanBarcode
                         scanFile()
                     } else {
-                        _destinationBoxBarcode.value = barcode
+                        _destinationBoxBarcode.value = cleanBarcode
                         confirmRefile()
                     }
                 }
@@ -96,13 +96,14 @@ class RefileViewModel @Inject constructor(
     }
 
     private fun handleScannerResult(barcode: String) {
+        val cleanBarcode = barcode.trim().replace("\r", "").replace("\n", "").replace("\t", "")
         when (scanStep) {
             ScanStep.FILE -> {
-                _scannedBarcode.value = barcode
+                _scannedBarcode.value = cleanBarcode
                 scanFile()
             }
             ScanStep.DESTINATION_BOX -> {
-                _destinationBoxBarcode.value = barcode
+                _destinationBoxBarcode.value = cleanBarcode
                 confirmRefile()
             }
         }

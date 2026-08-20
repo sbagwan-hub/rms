@@ -69,9 +69,13 @@ class RefileRepositoryImpl @Inject constructor(
         }
     }
 
+    private fun cleanBarcodeString(b: String): String =
+        b.trim().replace("\r", "").replace("\n", "").replace("\t", "")
+
     override suspend fun scanFile(barcode: String): Result<FileRecord> {
         return try {
-            val response = searchApiService.getFileDetail(barcode)
+            val cleanBarcode = cleanBarcodeString(barcode)
+            val response = searchApiService.getFileDetail(cleanBarcode)
             if (response.isSuccessful && response.body()?.data != null) {
                 val detail = response.body()!!.data!!
                 val location = Location(
@@ -99,7 +103,7 @@ class RefileRepositoryImpl @Inject constructor(
                 Result.success(fileRecord)
             } else {
                 val errorMsg = parseErrorMessage(response)
-                Result.failure(Exception(if (errorMsg.isNotBlank()) errorMsg else "File barcode $barcode is not registered. Please register the file before refiling."))
+                Result.failure(Exception(if (errorMsg.isNotBlank()) errorMsg else "File barcode $cleanBarcode was not found in the system."))
             }
         } catch (e: Exception) {
             Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
@@ -116,28 +120,30 @@ class RefileRepositoryImpl @Inject constructor(
         destinationBoxBarcode: String
     ): Result<RefileAction> {
         return try {
+            val cleanFile = cleanBarcodeString(fileBarcode)
+            val cleanDest = cleanBarcodeString(destinationBoxBarcode)
             val response = searchApiService.refileFile(
                 com.tionix.rms.feature.search.data.remote.RefileRequest(
-                    fileBarcode = fileBarcode,
-                    targetBoxBarcode = destinationBoxBarcode
+                    fileBarcode = cleanFile,
+                    targetBoxBarcode = cleanDest
                 )
             )
             if (response.isSuccessful && response.body()?.success == true) {
                 val data = response.body()?.data
                 val location = Location(
-                    id = data?.targetBoxId ?: destinationBoxBarcode,
-                    barcode = destinationBoxBarcode,
-                    name = destinationBoxBarcode,
+                    id = data?.targetBoxId ?: cleanDest,
+                    barcode = cleanDest,
+                    name = cleanDest,
                     room = "",
                     rack = "",
                     shelf = "",
                     type = LocationType.LOCATION
                 )
                 val srcBox = Box(id = data?.sourceBoxId ?: "", barcode = data?.sourceBoxBarcode ?: "Unassigned", description = "Source Box", location = location)
-                val dstBox = Box(id = data?.targetBoxId ?: destinationBoxBarcode, barcode = data?.targetBoxBarcode ?: destinationBoxBarcode, description = "Destination Box $destinationBoxBarcode", location = location)
-                val file = FileRecord(id = data?.fileId ?: fileBarcode, barcode = fileBarcode, title = "File $fileBarcode", currentBox = dstBox, currentLocation = location)
+                val dstBox = Box(id = data?.targetBoxId ?: cleanDest, barcode = data?.targetBoxBarcode ?: cleanDest, description = "Destination Box $cleanDest", location = location)
+                val file = FileRecord(id = data?.fileId ?: cleanFile, barcode = cleanFile, title = "File $cleanFile", currentBox = dstBox, currentLocation = location)
                 val action = RefileAction(
-                    id = data?.fileId ?: fileBarcode,
+                    id = data?.fileId ?: cleanFile,
                     fileRecord = file,
                     sourceBox = srcBox,
                     destinationBox = dstBox,
