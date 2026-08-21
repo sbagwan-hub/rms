@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
+import com.tionix.rms.core.audio.BeepPlayer
+import com.tionix.rms.feature.search.domain.model.SearchResult
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -35,7 +37,8 @@ class SearchViewModel @Inject constructor(
     val scannerRepository: ScannerRepository,
     private val initializeScannerUseCase: InitializeScannerUseCase,
     private val startScanningUseCase: StartScanningUseCase,
-    private val stopScanningUseCase: StopScanningUseCase
+    private val stopScanningUseCase: StopScanningUseCase,
+    private val beepPlayer: BeepPlayer
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
@@ -132,8 +135,10 @@ class SearchViewModel @Inject constructor(
 
     fun getBoxDetail(boxId: String, isRefresh: Boolean = false) {
         viewModelScope.launch {
-            if (isRefresh && _boxDetail.value != null) {
+            if (isRefresh) {
+                if (_isRefreshing.value) return@launch
                 _isRefreshing.value = true
+                android.util.Log.d("APPBAR_REFRESH", "Screen: BoxDetail\nAPI request started")
             } else {
                 _uiState.value = SearchUiState.Loading
             }
@@ -141,18 +146,22 @@ class SearchViewModel @Inject constructor(
             val result = getBoxDetailUseCase(boxId)
             
             if (result.isSuccess) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: BoxDetail\nAPI response: 200\nState updated")
                 val detail = result.getOrNull()
                 _boxDetail.value = detail
                 _uiState.value = SearchUiState.BoxDetailLoaded
             } else {
                 val errMsg = result.exceptionOrNull()?.message ?: "Failed to load box details"
                 if (isRefresh && _boxDetail.value != null) {
-                    _refreshError.emit("Unable to refresh box details. Please try again.")
+                    _refreshError.emit("Unable to refresh data. Please try again.")
                 } else {
                     _uiState.value = SearchUiState.Error(errMsg)
                 }
             }
             _isRefreshing.value = false
+            if (isRefresh) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: BoxDetail\nRefresh completed")
+            }
         }
     }
 
@@ -187,6 +196,18 @@ class SearchViewModel @Inject constructor(
                 onComplete(false, err)
             }
         }
+    }
+
+    suspend fun validateAndLookupBarcode(barcode: String): Result<SearchResult?> {
+        return searchByBarcodeUseCase(barcode)
+    }
+
+    fun playPositiveBeep() {
+        beepPlayer.positive()
+    }
+
+    fun playErrorBeep() {
+        beepPlayer.error()
     }
 
     fun clearInsertMessage() {

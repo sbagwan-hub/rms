@@ -48,6 +48,14 @@ fun InventoryVerificationScreen(
     }
 
     val activeVerification = currentVerification
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshError.collect { errorMsg ->
+            snackbarHostState.showSnackbar(errorMsg)
+        }
+    }
 
     if (activeVerification != null) {
         ScannerEffect(
@@ -60,6 +68,7 @@ fun InventoryVerificationScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -94,9 +103,10 @@ fun InventoryVerificationScreen(
                 },
                 actions = {
                     if (activeVerification == null) {
-                        IconButton(onClick = { viewModel.loadAssignedVerifications() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                        }
+                        com.tionix.rms.ui.components.RMSRefreshIconButton(
+                            isRefreshing = isRefreshing,
+                            onRefresh = { viewModel.loadAssignedVerifications(isRefresh = true) }
+                        )
                     } else {
                         IconButton(onClick = { viewModel.exitVerification() }) {
                             Icon(Icons.Default.Close, contentDescription = "Exit")

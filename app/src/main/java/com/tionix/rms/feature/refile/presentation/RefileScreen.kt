@@ -57,8 +57,16 @@ fun RefileScreen(
 
     val session = currentSession
     val file = currentFile
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshError.collect { errorMsg ->
+            snackbarHostState.showSnackbar(errorMsg)
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Refile") },
@@ -353,7 +361,7 @@ fun RefileScreen(
                             ) {
                                 Column(
                                     modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Text(
                                         text = "✓ ${state.message}",
@@ -371,6 +379,18 @@ fun RefileScreen(
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = Color(0xFF1B5E20)
                                     )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Button(
+                                        onClick = { viewModel.resetRefile() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = Color(0xFF2E7D32)
+                                        )
+                                    ) {
+                                        Icon(Icons.Default.Refresh, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Refile Another File")
+                                    }
                                 }
                             }
                         }

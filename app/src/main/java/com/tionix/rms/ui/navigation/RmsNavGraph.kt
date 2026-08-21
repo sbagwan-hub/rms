@@ -41,10 +41,26 @@ import com.tionix.rms.ui.screens.splash.SplashScreen
 import com.tionix.rms.ui.screens.scan.ScanScreen
 
 @Composable
-fun RmsNavGraph() {
+fun RmsNavGraph(
+    authEventBus: com.tionix.rms.core.network.AuthEventBus? = null
+) {
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.hierarchy?.firstOrNull()?.route
+
+    if (authEventBus != null) {
+        androidx.compose.runtime.LaunchedEffect(authEventBus) {
+            authEventBus.events.collect { event ->
+                val current = navController.currentDestination?.route
+                if (current != RmsRoutes.LOGIN && current != RmsRoutes.SPLASH) {
+                    navController.navigate(RmsRoutes.LOGIN) {
+                        popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = {

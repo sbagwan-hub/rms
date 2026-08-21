@@ -68,12 +68,20 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideTokenAuthenticator(preferences: AuthPreferences): Authenticator =
-        TokenAuthenticator(preferences)
+    fun provideTokenAuthenticator(
+        preferences: AuthPreferences,
+        authEventBus: com.tionix.rms.core.network.AuthEventBus,
+        dynamicHostInterceptor: com.tionix.rms.core.network.DynamicHostInterceptor
+    ): Authenticator =
+        TokenAuthenticator(preferences, authEventBus, dynamicHostInterceptor)
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(authInterceptor: Interceptor, tokenAuthenticator: Authenticator): OkHttpClient {
+    fun provideOkHttpClient(
+        authInterceptor: Interceptor,
+        tokenAuthenticator: Authenticator,
+        dynamicHostInterceptor: com.tionix.rms.core.network.DynamicHostInterceptor
+    ): OkHttpClient {
         val logging = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
         }
@@ -84,6 +92,7 @@ object NetworkModule {
             .writeTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
             .retryOnConnectionFailure(true)
             .connectionPool(okhttp3.ConnectionPool(5, 10, java.util.concurrent.TimeUnit.SECONDS))
+            .addInterceptor(dynamicHostInterceptor)
             .addInterceptor(authInterceptor)
             .addInterceptor(EnvelopeUnwrappingInterceptor())
             .addInterceptor(logging)
@@ -202,11 +211,14 @@ object NetworkModule {
  */
 class TokenAuthenticator(
     private val preferences: AuthPreferences,
+    private val authEventBus: com.tionix.rms.core.network.AuthEventBus,
+    private val dynamicHostInterceptor: com.tionix.rms.core.network.DynamicHostInterceptor
 ) : Authenticator {
 
     private val refreshClient = OkHttpClient.Builder()
         .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
         .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+        .addInterceptor(dynamicHostInterceptor)
         .build()
 
     override fun authenticate(route: Route?, response: Response): Request? {
@@ -221,16 +233,23 @@ class TokenAuthenticator(
         }
 
         val refreshToken = runBlocking { preferences.getRefreshToken() }
-        if (refreshToken.isNullOrBlank()) return null
-
-        val newAccessToken = runBlocking { callRefresh(refreshToken) }
-        if (newAccessToken == null) {
-            // Refresh token itself is dead — clear the session so the next
-            // screen load's session check routes back to Login (07-navigation.md).
+        if (refreshToken.isNullOrBlank()) {
+            android.util.Log.w("RMS_AUTH", "No refresh token available on 401. Clearing session and logging out.")
             runBlocking { preferences.clear() }
+            authEventBus.emitLogout("Session expired. Please log in again.")
             return null
         }
 
+        val newAccessToken = runBlocking { callRefresh(refreshToken) }
+        if (newAccessToken == null) {
+            // Refresh token itself is dead/expired — clear all auth data and trigger automatic logout
+            android.util.Log.w("RMS_AUTH", "Refresh token failed on 401. Clearing session and logging out.")
+            runBlocking { preferences.clear() }
+            authEventBus.emitLogout("Session expired. Please log in again.")
+            return null
+        }
+
+        android.util.Log.i("RMS_AUTH", "Token successfully refreshed. Retrying original request.")
         return response.request.newBuilder()
             .header("Authorization", "Bearer $newAccessToken")
             .build()

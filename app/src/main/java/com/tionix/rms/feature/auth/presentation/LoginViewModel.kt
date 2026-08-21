@@ -15,6 +15,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import com.tionix.rms.core.settings.AppSettingsStore
+import com.tionix.rms.BuildConfig
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 @HiltViewModel
@@ -23,8 +27,22 @@ class LoginViewModel @Inject constructor(
     private val loginWithBiometricUseCase: LoginWithBiometricUseCase,
     private val checkBiometricAvailabilityUseCase: CheckBiometricAvailabilityUseCase,
     private val apiService: ApiService,
+    private val appSettingsStore: AppSettingsStore,
     val scannerManager: ScannerManager
 ) : ViewModel() {
+
+    val serverUrl: StateFlow<String> = appSettingsStore.serverUrlFlow.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Eagerly,
+        initialValue = BuildConfig.API_BASE_URL
+    )
+
+    fun updateServerUrl(url: String) {
+        viewModelScope.launch {
+            appSettingsStore.setServerUrl(url.trim())
+            loadSites()
+        }
+    }
 
     private val _uiState = MutableStateFlow<LoginUiState>(LoginUiState.Idle)
     val uiState: StateFlow<LoginUiState> = _uiState.asStateFlow()

@@ -27,12 +27,21 @@ fun SyncQueueScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val syncQueue by viewModel.syncQueue.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshError.collect { errorMsg ->
+            snackbarHostState.showSnackbar(errorMsg)
+        }
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadSyncQueue()
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Sync Queue") },
@@ -43,9 +52,10 @@ fun SyncQueueScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.loadSyncQueue() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
+                    com.tionix.rms.ui.components.RMSRefreshIconButton(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.loadSyncQueue(isRefresh = true) }
+                    )
                 }
             )
         }

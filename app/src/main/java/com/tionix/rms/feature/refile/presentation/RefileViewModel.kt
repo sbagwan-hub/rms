@@ -14,8 +14,11 @@ import com.tionix.rms.feature.refile.domain.model.RefileSession
 import com.tionix.rms.feature.refile.domain.repository.RefileRepository
 import com.tionix.rms.feature.refile.domain.usecase.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -75,11 +78,18 @@ class RefileViewModel @Inject constructor(
         // Collect scanner results for continuous scanning in both batch and normal modes
         viewModelScope.launch {
             scannerRepository.scanResults.collect { result ->
-                val cleanBarcode = result.barcode.trim().replace("\r", "").replace("\n", "").replace("\t", "")
+                val cleanBarcode = result.barcode.trim().replace("\r", "").replace("\n", "").replace("\t", "").uppercase()
+                if (cleanBarcode.isBlank()) return@collect
                 if (_batchMode.value) {
                     handleScannerResult(cleanBarcode)
                 } else {
-                    if (_currentFile.value == null) {
+                    if (_uiState.value is RefileUiState.RefileSuccess) {
+                        // Previous refile completed, start next file scan immediately
+                        _currentFile.value = null
+                        _destinationBoxBarcode.value = ""
+                        _scannedBarcode.value = cleanBarcode
+                        scanFile()
+                    } else if (_currentFile.value == null) {
                         _scannedBarcode.value = cleanBarcode
                         scanFile()
                     } else {
@@ -96,7 +106,8 @@ class RefileViewModel @Inject constructor(
     }
 
     private fun handleScannerResult(barcode: String) {
-        val cleanBarcode = barcode.trim().replace("\r", "").replace("\n", "").replace("\t", "")
+        val cleanBarcode = barcode.trim().replace("\r", "").replace("\n", "").replace("\t", "").uppercase()
+        if (cleanBarcode.isBlank()) return
         when (scanStep) {
             ScanStep.FILE -> {
                 _scannedBarcode.value = cleanBarcode
@@ -112,10 +123,15 @@ class RefileViewModel @Inject constructor(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    private val _refreshError = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+    val refreshError: kotlinx.coroutines.flow.SharedFlow<String> = _refreshError.asSharedFlow()
+
     fun loadAssignedRefiles(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            if (isRefresh && _uiState.value is RefileUiState.Success) {
+            if (isRefresh) {
+                if (_isRefreshing.value) return@launch
                 _isRefreshing.value = true
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Refile\nAPI request started")
             } else {
                 _uiState.value = RefileUiState.Loading
             }
@@ -123,15 +139,21 @@ class RefileViewModel @Inject constructor(
             val result = repository.getAssignedRefiles()
             
             if (result.isSuccess) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Refile\nAPI response: 200\nState updated")
                 _uiState.value = RefileUiState.Success(result.getOrNull() ?: emptyList())
             } else {
-                if (!isRefresh || _uiState.value !is RefileUiState.Success) {
+                if (isRefresh && _uiState.value is RefileUiState.Success) {
+                    _refreshError.emit("Unable to refresh data. Please try again.")
+                } else {
                     _uiState.value = RefileUiState.Error(
                         result.exceptionOrNull()?.message ?: "Failed to load refiles"
                     )
                 }
             }
             _isRefreshing.value = false
+            if (isRefresh) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Refile\nRefresh completed")
+            }
         }
     }
 
@@ -182,10 +204,24 @@ class RefileViewModel @Inject constructor(
 
     fun scanFile() {
         viewModelScope.launch {
-            val result = scanFileUseCase(_scannedBarcode.value)
+            val barcodeToScan = _scannedBarcode.value.trim().replace("\r", "").replace("\n", "").replace("\t", "").uppercase()
+            if (barcodeToScan.isBlank()) {
+                _uiState.value = RefileUiState.Error("Please scan or enter a File barcode.")
+                beepPlayer.error()
+                return@launch
+            }
+            android.util.Log.d("REFILE", "[REFILE] scanned: $barcodeToScan")
+            
+            // Clear previous file state before scanning new file
+            _currentFile.value = null
+            _destinationBoxBarcode.value = ""
+            
+            val result = scanFileUseCase(barcodeToScan)
             if (result.isSuccess) {
-                _currentFile.value = result.getOrNull()
-                _uiState.value = RefileUiState.FileScanned(result.getOrNull())
+                val fileRec = result.getOrNull()
+                android.util.Log.d("REFILE", "[REFILE] lookup response: ${fileRec?.barcode}, current box: ${fileRec?.currentBox?.barcode}")
+                _currentFile.value = fileRec
+                _uiState.value = RefileUiState.FileScanned(fileRec)
                 beepPlayer.positive()
                 
                 // In batch mode, move to destination box scanning step
@@ -193,7 +229,9 @@ class RefileViewModel @Inject constructor(
                     scanStep = ScanStep.DESTINATION_BOX
                 }
             } else {
-                _uiState.value = RefileUiState.Error(result.exceptionOrNull()?.message ?: "Scan failed")
+                val errMsg = result.exceptionOrNull()?.message ?: "Scan failed"
+                android.util.Log.w("REFILE", "[REFILE] lookup response: FAILURE ($errMsg)")
+                _uiState.value = RefileUiState.Error(errMsg)
                 beepPlayer.error()
             }
         }
@@ -202,13 +240,15 @@ class RefileViewModel @Inject constructor(
     fun confirmRefile() {
         viewModelScope.launch {
             val fileBarcode = _currentFile.value?.barcode ?: return@launch
-            val destinationBoxBarcode = _destinationBoxBarcode.value
+            val destinationBoxBarcode = _destinationBoxBarcode.value.trim().replace("\r", "").replace("\n", "").replace("\t", "").uppercase()
             
             if (destinationBoxBarcode.isBlank()) {
                 _uiState.value = RefileUiState.Error("Destination box barcode is required")
                 beepPlayer.error()
                 return@launch
             }
+
+            android.util.Log.d("REFILE", "[REFILE] current box: ${_currentFile.value?.currentBox?.barcode}, destination: $destinationBoxBarcode")
 
             val result = confirmRefileUseCase(fileBarcode, destinationBoxBarcode)
             if (result.isSuccess) {
@@ -218,6 +258,7 @@ class RefileViewModel @Inject constructor(
                 
                 val fromBoxBarcode = action.sourceBox.barcode
                 val toBoxBarcode = action.destinationBox.barcode
+                android.util.Log.d("REFILE", "[REFILE] refile response: SUCCESS (from: $fromBoxBarcode -> to: $toBoxBarcode)")
 
                 if (_batchMode.value) {
                     // Clear for next scan in batch mode and reset to file scanning step
@@ -227,18 +268,32 @@ class RefileViewModel @Inject constructor(
                     scanStep = ScanStep.FILE
                 } else {
                     _uiState.value = RefileUiState.RefileSuccess(
-                        message = "File $fileBarcode refiled successfully",
+                        message = "File $fileBarcode successfully refiled.",
                         fileBarcode = fileBarcode,
                         fromBox = fromBoxBarcode,
                         toBox = toBoxBarcode
                     )
                 }
             } else {
-                _showMismatchDialog.value = true
-                _uiState.value = RefileUiState.Error(result.exceptionOrNull()?.message ?: "Refile failed")
+                val errMsg = result.exceptionOrNull()?.message ?: "Refile failed"
+                android.util.Log.w("REFILE", "[REFILE] refile response: FAILURE ($errMsg)")
+                if (errMsg.contains("LOCATION_MISMATCH", ignoreCase = true) || errMsg.contains("wrong location", ignoreCase = true)) {
+                    _showMismatchDialog.value = true
+                } else {
+                    _showMismatchDialog.value = false
+                }
+                _uiState.value = RefileUiState.Error(errMsg)
                 beepPlayer.error()
             }
         }
+    }
+
+    fun resetRefile() {
+        _currentFile.value = null
+        _scannedBarcode.value = ""
+        _destinationBoxBarcode.value = ""
+        scanStep = ScanStep.FILE
+        loadAssignedRefiles()
     }
 
     fun overrideMismatch() {

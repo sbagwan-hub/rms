@@ -14,8 +14,11 @@ import com.tionix.rms.feature.segregation.domain.model.SessionStatus
 import com.tionix.rms.feature.segregation.domain.repository.SegregationRepository
 import com.tionix.rms.feature.segregation.domain.usecase.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -83,17 +86,39 @@ class SegregationViewModel @Inject constructor(
         }
     }
 
-    fun loadAssignedSegregations() {
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _refreshError = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+    val refreshError: kotlinx.coroutines.flow.SharedFlow<String> = _refreshError.asSharedFlow()
+
+    fun loadAssignedSegregations(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = SegregationUiState.Loading
+            if (isRefresh) {
+                if (_isRefreshing.value) return@launch
+                _isRefreshing.value = true
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Segregation\nAPI request started")
+            } else {
+                _uiState.value = SegregationUiState.Loading
+            }
+
             val result = repository.getAssignedSegregations()
             
             if (result.isSuccess) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Segregation\nAPI response: 200\nState updated")
                 _uiState.value = SegregationUiState.Success(result.getOrNull() ?: emptyList())
             } else {
-                _uiState.value = SegregationUiState.Error(
-                    result.exceptionOrNull()?.message ?: "Failed to load segregations"
-                )
+                if (isRefresh && _uiState.value is SegregationUiState.Success) {
+                    _refreshError.emit("Unable to refresh data. Please try again.")
+                } else {
+                    _uiState.value = SegregationUiState.Error(
+                        result.exceptionOrNull()?.message ?: "Failed to load segregations"
+                    )
+                }
+            }
+            _isRefreshing.value = false
+            if (isRefresh) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Segregation\nRefresh completed")
             }
         }
     }

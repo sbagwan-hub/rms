@@ -15,8 +15,11 @@ import com.tionix.rms.feature.inventory.domain.usecase.GetExpectedBoxesUseCase
 import com.tionix.rms.feature.inventory.domain.usecase.StartVerificationUseCase
 import com.tionix.rms.feature.inventory.domain.usecase.VerifyBoxUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -52,21 +55,43 @@ class InventoryVerificationViewModel @Inject constructor(
     private val _showDiscrepancyDialog = MutableStateFlow(false)
     val showDiscrepancyDialog: StateFlow<Boolean> = _showDiscrepancyDialog.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _refreshError = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+    val refreshError: kotlinx.coroutines.flow.SharedFlow<String> = _refreshError.asSharedFlow()
+
     init {
         loadAssignedVerifications()
     }
 
-    fun loadAssignedVerifications() {
+    fun loadAssignedVerifications(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = InventoryVerificationUiState.Loading
+            if (isRefresh) {
+                if (_isRefreshing.value) return@launch
+                _isRefreshing.value = true
+                android.util.Log.d("APPBAR_REFRESH", "Screen: InventoryVerification\nAPI request started")
+            } else {
+                _uiState.value = InventoryVerificationUiState.Loading
+            }
+
             val result = repository.getAssignedVerifications()
             
             if (result.isSuccess) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: InventoryVerification\nAPI response: 200\nState updated")
                 _uiState.value = InventoryVerificationUiState.Success(result.getOrNull() ?: emptyList())
             } else {
-                _uiState.value = InventoryVerificationUiState.Error(
-                    result.exceptionOrNull()?.message ?: "Failed to load verifications"
-                )
+                if (isRefresh && _uiState.value is InventoryVerificationUiState.Success) {
+                    _refreshError.emit("Unable to refresh data. Please try again.")
+                } else {
+                    _uiState.value = InventoryVerificationUiState.Error(
+                        result.exceptionOrNull()?.message ?: "Failed to load verifications"
+                    )
+                }
+            }
+            _isRefreshing.value = false
+            if (isRefresh) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: InventoryVerification\nRefresh completed")
             }
         }
     }

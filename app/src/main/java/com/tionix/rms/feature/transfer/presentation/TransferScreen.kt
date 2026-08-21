@@ -54,8 +54,17 @@ fun TransferScreen(
 
     // Capture to local val so smart casts work (delegated properties can't be smart-cast directly)
     val session = currentSession
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshError.collect { errorMsg ->
+            snackbarHostState.showSnackbar(errorMsg)
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Transfer") },
@@ -66,9 +75,10 @@ fun TransferScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.loadAssignedTransfers() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
+                    com.tionix.rms.ui.components.RMSRefreshIconButton(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.loadAssignedTransfers(isRefresh = true) }
+                    )
                     
                     if (currentSession != null) {
                         IconButton(onClick = { viewModel.resetTransfer() }) {

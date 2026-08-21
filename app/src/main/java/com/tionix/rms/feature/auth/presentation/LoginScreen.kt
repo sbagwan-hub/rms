@@ -37,6 +37,9 @@ import com.tionix.rms.ui.components.PrimaryButton
 import com.tionix.rms.ui.components.SecondaryButton
 import com.tionix.rms.ui.components.RMSTextField
 
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Dns
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
@@ -52,8 +55,11 @@ fun LoginScreen(
     val selectedSite by viewModel.selectedSite.collectAsStateWithLifecycle()
     val siteError by viewModel.siteError.collectAsStateWithLifecycle()
     val sitesLoading by viewModel.sitesLoading.collectAsStateWithLifecycle()
+    val serverUrl by viewModel.serverUrl.collectAsStateWithLifecycle()
     var passwordVisible by remember { mutableStateOf(false) }
     var siteDropdownExpanded by remember { mutableStateOf(false) }
+    var showServerConfigDialog by remember { mutableStateOf(false) }
+    var editServerUrl by remember(serverUrl) { mutableStateOf(serverUrl) }
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     
@@ -341,12 +347,102 @@ fun LoginScreen(
                 }
             }
 
-            // Footer device ID info
-            Text(
-                text = "Device ID: $deviceId",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-            )
+            // Footer info & Server Config
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Device ID: $deviceId",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+
+                TextButton(
+                    onClick = {
+                        editServerUrl = serverUrl
+                        showServerConfigDialog = true
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Dns,
+                        contentDescription = "Server Settings",
+                        modifier = Modifier.size(14.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Server Config",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
         }
+    }
+
+    if (showServerConfigDialog) {
+        AlertDialog(
+            onDismissRequest = { showServerConfigDialog = false },
+            title = {
+                Text("Backend Server URL", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        "Configure the API base URL for this device (e.g. your Mac IP for physical devices or 10.0.2.2 for emulator):",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedTextField(
+                        value = editServerUrl,
+                        onValueChange = { editServerUrl = it },
+                        label = { Text("Server URL") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        textStyle = MaterialTheme.typography.bodyMedium
+                    )
+
+                    Text(
+                        "Quick Presets:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        SuggestionChip(
+                            onClick = { editServerUrl = "http://192.168.1.7:3002/api/v1/mobile/" },
+                            label = { Text("Mac Wi-Fi IP (192.168.1.7:3002)", style = MaterialTheme.typography.bodySmall) }
+                        )
+                        SuggestionChip(
+                            onClick = { editServerUrl = "http://10.0.2.2:3002/api/v1/mobile/" },
+                            label = { Text("Android Emulator (10.0.2.2:3002)", style = MaterialTheme.typography.bodySmall) }
+                        )
+                        SuggestionChip(
+                            onClick = { editServerUrl = "http://127.0.0.1:3002/api/v1/mobile/" },
+                            label = { Text("USB Reverse (127.0.0.1:3002)", style = MaterialTheme.typography.bodySmall) }
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.updateServerUrl(editServerUrl)
+                        showServerConfigDialog = false
+                    }
+                ) {
+                    Text("Save & Connect")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showServerConfigDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

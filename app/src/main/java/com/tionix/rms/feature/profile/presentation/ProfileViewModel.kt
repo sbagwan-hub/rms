@@ -8,8 +8,11 @@ import com.tionix.rms.feature.profile.domain.usecase.GetProfileUseCase
 import com.tionix.rms.feature.profile.domain.usecase.LogoutUseCase
 import com.tionix.rms.feature.sync.data.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -38,6 +41,9 @@ class ProfileViewModel @Inject constructor(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    private val _refreshError = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+    val refreshError: kotlinx.coroutines.flow.SharedFlow<String> = _refreshError.asSharedFlow()
+
     init {
         refresh()
     }
@@ -45,7 +51,9 @@ class ProfileViewModel @Inject constructor(
     fun refresh() {
         viewModelScope.launch {
             if (_profile.value != null) {
+                if (_isRefreshing.value) return@launch
                 _isRefreshing.value = true
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Profile\nAPI request started")
             } else {
                 _uiState.value = ProfileUiState.Loading
             }
@@ -53,6 +61,7 @@ class ProfileViewModel @Inject constructor(
             val profileResult = getProfileUseCase()
             val pendingResult = getPendingSyncCountUseCase()
             if (profileResult.isSuccess) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Profile\nAPI response: 200\nState updated")
                 _profile.value = profileResult.getOrNull()
                 _pendingSyncCount.value = pendingResult.getOrNull() ?: 0
                 _uiState.value = ProfileUiState.Success
@@ -61,9 +70,14 @@ class ProfileViewModel @Inject constructor(
                     _uiState.value = ProfileUiState.Error(
                         profileResult.exceptionOrNull()?.message ?: "Failed to load profile"
                     )
+                } else {
+                    _refreshError.emit("Unable to refresh data. Please try again.")
                 }
             }
             _isRefreshing.value = false
+            if (_profile.value != null) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Profile\nRefresh completed")
+            }
         }
     }
 

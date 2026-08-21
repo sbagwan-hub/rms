@@ -47,12 +47,18 @@ data class RefileResponse(
 )
 
 data class RefileData(
-    val fileId: String,
-    val fileBarcode: String,
-    val sourceBoxId: String,
-    val sourceBoxBarcode: String,
-    val targetBoxId: String,
-    val targetBoxBarcode: String
+    val fileId: String? = null,
+    val fileBarcode: String? = null,
+    val sourceBoxId: String? = null,
+    val sourceBoxBarcode: String? = null,
+    val targetBoxId: String? = null,
+    val targetBoxBarcode: String? = null,
+    val previousBoxId: String? = null,
+    val previousBoxBarcode: String? = null,
+    val newBoxId: String? = null,
+    val newBoxBarcode: String? = null,
+    val previousLocation: String? = null,
+    val newLocation: String? = null
 )
 
 data class InsertFileRequest(

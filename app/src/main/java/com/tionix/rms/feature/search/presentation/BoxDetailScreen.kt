@@ -56,8 +56,34 @@ fun BoxDetailScreen(
         if (showInsertDialog) {
             viewModel.startScanner()
             viewModel.scannerRepository.scanResults.collect { scanResult ->
-                if (scanResult.barcode.isNotBlank()) {
-                    inputBarcode = scanResult.barcode.trim().uppercase()
+                val rawBarcode = scanResult.barcode.trim().replace("\r", "").replace("\n", "").replace("\t", "").uppercase()
+                if (rawBarcode.isNotBlank()) {
+                    val checkResult = viewModel.validateAndLookupBarcode(rawBarcode)
+                    val resultData = checkResult.getOrNull()
+                    if (resultData is com.tionix.rms.feature.search.domain.model.SearchResult.BoxResult || rawBarcode.equals(boxDetail?.barcode ?: boxId, ignoreCase = true)) {
+                        viewModel.playErrorBeep()
+                        insertStatusMessage = "Invalid barcode. Please scan a File barcode."
+                        inputBarcode = ""
+                    } else if (resultData is com.tionix.rms.feature.search.domain.model.SearchResult.FileRecordResult) {
+                        viewModel.playPositiveBeep()
+                        insertStatusMessage = null
+                        inputBarcode = rawBarcode
+                    } else if (checkResult.isSuccess && resultData == null) {
+                        // Barcode not in Box or File, let insertFile check or accept if file prefix
+                        if (rawBarcode.startsWith("BX") || rawBarcode.startsWith("BOX") || rawBarcode.startsWith("LOC") || rawBarcode.startsWith("SH") || rawBarcode.startsWith("RK")) {
+                            viewModel.playErrorBeep()
+                            insertStatusMessage = "Invalid barcode. Please scan a File barcode."
+                            inputBarcode = ""
+                        } else {
+                            viewModel.playPositiveBeep()
+                            insertStatusMessage = null
+                            inputBarcode = rawBarcode
+                        }
+                    } else {
+                        viewModel.playErrorBeep()
+                        insertStatusMessage = checkResult.exceptionOrNull()?.message ?: "Invalid barcode. Please scan a File barcode."
+                        inputBarcode = ""
+                    }
                 }
             }
         }
@@ -95,13 +121,22 @@ fun BoxDetailScreen(
                     insertStatusMessage = null
                 }
             },
-            title = { Text("Insert File into Box") },
+            title = {
+                Column {
+                    Text("Insert File into Box", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Target Box: ${boxDetail?.barcode ?: boxId}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(
-                        text = "Point Honeywell scanner at File barcode (e.g. MAC5832458) or tap Activate Scanner:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = "Scan the File barcode (e.g. MAC5832458):",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
                     )
 
                     Button(
@@ -169,11 +204,19 @@ fun BoxDetailScreen(
                     }
 
                     if (insertStatusMessage != null) {
-                        Text(
-                            text = insertStatusMessage!!,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = insertStatusMessage!!,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
                     }
                 }
             },
@@ -191,6 +234,7 @@ fun BoxDetailScreen(
                             ) { success, msg ->
                                 isInserting = false
                                 if (success) {
+                                    viewModel.playPositiveBeep()
                                     val targetBoxLabel = boxDetail?.barcode ?: boxId
                                     val successToastMsg = "✓ File inserted successfully\n$cleanCode has been inserted into Box $targetBoxLabel"
                                     android.widget.Toast.makeText(context, successToastMsg, android.widget.Toast.LENGTH_LONG).show()
@@ -204,6 +248,7 @@ fun BoxDetailScreen(
                                     inputBarcode = ""
                                     insertStatusMessage = null
                                 } else {
+                                    viewModel.playErrorBeep()
                                     insertStatusMessage = msg
                                 }
                             }

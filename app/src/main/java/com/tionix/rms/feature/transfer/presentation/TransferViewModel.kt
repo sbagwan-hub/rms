@@ -13,8 +13,11 @@ import com.tionix.rms.feature.transfer.domain.model.TransferType
 import com.tionix.rms.feature.transfer.domain.repository.TransferRepository
 import com.tionix.rms.feature.transfer.domain.usecase.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -87,17 +90,39 @@ class TransferViewModel @Inject constructor(
         }
     }
 
-    fun loadAssignedTransfers() {
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _refreshError = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+    val refreshError: kotlinx.coroutines.flow.SharedFlow<String> = _refreshError.asSharedFlow()
+
+    fun loadAssignedTransfers(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = TransferUiState.Loading
+            if (isRefresh) {
+                if (_isRefreshing.value) return@launch
+                _isRefreshing.value = true
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Transfer\nAPI request started")
+            } else {
+                _uiState.value = TransferUiState.Loading
+            }
+
             val result = repository.getAssignedTransfers()
             
             if (result.isSuccess) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Transfer\nAPI response: 200\nState updated")
                 _uiState.value = TransferUiState.Success(result.getOrNull() ?: emptyList())
             } else {
-                _uiState.value = TransferUiState.Error(
-                    result.exceptionOrNull()?.message ?: "Failed to load transfers"
-                )
+                if (isRefresh && _uiState.value is TransferUiState.Success) {
+                    _refreshError.emit("Unable to refresh data. Please try again.")
+                } else {
+                    _uiState.value = TransferUiState.Error(
+                        result.exceptionOrNull()?.message ?: "Failed to load transfers"
+                    )
+                }
+            }
+            _isRefreshing.value = false
+            if (isRefresh) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Transfer\nRefresh completed")
             }
         }
     }

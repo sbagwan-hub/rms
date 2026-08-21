@@ -103,7 +103,7 @@ class RefileRepositoryImpl @Inject constructor(
                 Result.success(fileRecord)
             } else {
                 val errorMsg = parseErrorMessage(response)
-                Result.failure(Exception(if (errorMsg.isNotBlank()) errorMsg else "File barcode $cleanBarcode was not found in the system."))
+                Result.failure(Exception(if (errorMsg.isNotBlank()) errorMsg else "File barcode $cleanBarcode is not registered. Please register the file before refiling."))
             }
         } catch (e: Exception) {
             Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))
@@ -131,17 +131,33 @@ class RefileRepositoryImpl @Inject constructor(
             if (response.isSuccessful && response.body()?.success == true) {
                 val data = response.body()?.data
                 val location = Location(
-                    id = data?.targetBoxId ?: cleanDest,
-                    barcode = cleanDest,
-                    name = cleanDest,
+                    id = data?.newBoxId ?: data?.targetBoxId ?: cleanDest,
+                    barcode = data?.newBoxBarcode ?: data?.targetBoxBarcode ?: cleanDest,
+                    name = data?.newLocation ?: cleanDest,
                     room = "",
                     rack = "",
                     shelf = "",
                     type = LocationType.LOCATION
                 )
-                val srcBox = Box(id = data?.sourceBoxId ?: "", barcode = data?.sourceBoxBarcode ?: "Unassigned", description = "Source Box", location = location)
-                val dstBox = Box(id = data?.targetBoxId ?: cleanDest, barcode = data?.targetBoxBarcode ?: cleanDest, description = "Destination Box $cleanDest", location = location)
-                val file = FileRecord(id = data?.fileId ?: cleanFile, barcode = cleanFile, title = "File $cleanFile", currentBox = dstBox, currentLocation = location)
+                val srcBox = Box(
+                    id = data?.previousBoxId ?: data?.sourceBoxId ?: "",
+                    barcode = data?.previousBoxBarcode ?: data?.sourceBoxBarcode ?: "Unassigned",
+                    description = "Previous Box",
+                    location = location
+                )
+                val dstBox = Box(
+                    id = data?.newBoxId ?: data?.targetBoxId ?: cleanDest,
+                    barcode = data?.newBoxBarcode ?: data?.targetBoxBarcode ?: cleanDest,
+                    description = "New Box ${data?.newBoxBarcode ?: cleanDest}",
+                    location = location
+                )
+                val file = FileRecord(
+                    id = data?.fileId ?: cleanFile,
+                    barcode = data?.fileBarcode ?: cleanFile,
+                    title = "File ${data?.fileBarcode ?: cleanFile}",
+                    currentBox = dstBox,
+                    currentLocation = location
+                )
                 val action = RefileAction(
                     id = data?.fileId ?: cleanFile,
                     fileRecord = file,

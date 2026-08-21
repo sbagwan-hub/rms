@@ -44,6 +44,9 @@ class DashboardViewModel @Inject constructor(
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
 
+    private val _refreshError = MutableSharedFlow<String>()
+    val refreshError: SharedFlow<String> = _refreshError.asSharedFlow()
+
     init {
         loadDashboardData(isRefresh = false)
     }
@@ -51,7 +54,9 @@ class DashboardViewModel @Inject constructor(
     fun loadDashboardData(isRefresh: Boolean = false) {
         viewModelScope.launch {
             if (isRefresh) {
+                if (_isRefreshing.value) return@launch
                 _isRefreshing.value = true
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Dashboard\nAPI request started")
             } else if (_uiState.value !is DashboardUiState.Success) {
                 _uiState.value = DashboardUiState.Loading
             }
@@ -61,7 +66,8 @@ class DashboardViewModel @Inject constructor(
             val tasksResult = getAssignedTasksUseCase()
             val reportsResult = if (canViewReports) getReportsSummaryUseCase() else null
 
-            if (statsResult.isSuccess && tasksResult.isSuccess) {
+            if (statsResult.isSuccess) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Dashboard\nAPI response: 200\nState updated")
                 _uiState.value = DashboardUiState.Success(
                     stats = statsResult.getOrNull()!!,
                     tasks = tasksResult.getOrNull() ?: emptyList(),
@@ -69,15 +75,19 @@ class DashboardViewModel @Inject constructor(
                     canViewReports = canViewReports
                 )
             } else {
+                val errorMsg = statsResult.exceptionOrNull()?.message
+                    ?: tasksResult.exceptionOrNull()?.message
+                    ?: "Failed to load dashboard data"
                 if (_uiState.value !is DashboardUiState.Success) {
-                    _uiState.value = DashboardUiState.Error(
-                        statsResult.exceptionOrNull()?.message
-                            ?: tasksResult.exceptionOrNull()?.message
-                            ?: "Unknown error"
-                    )
+                    _uiState.value = DashboardUiState.Error(errorMsg)
+                } else if (isRefresh) {
+                    _refreshError.emit("Unable to refresh data. Please try again.")
                 }
             }
             _isRefreshing.value = false
+            if (isRefresh) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Dashboard\nRefresh completed")
+            }
         }
     }
 

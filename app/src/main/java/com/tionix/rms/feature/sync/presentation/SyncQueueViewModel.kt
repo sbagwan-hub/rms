@@ -9,8 +9,11 @@ import com.tionix.rms.feature.sync.domain.usecase.GetPendingSyncQueueUseCase
 import com.tionix.rms.feature.sync.domain.usecase.RetryAllFailedItemsUseCase
 import com.tionix.rms.feature.sync.domain.usecase.RetrySyncItemUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -30,20 +33,41 @@ class SyncQueueViewModel @Inject constructor(
     private val _syncQueue = MutableStateFlow<PendingSyncQueue?>(null)
     val syncQueue: StateFlow<PendingSyncQueue?> = _syncQueue.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _refreshError = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+    val refreshError: kotlinx.coroutines.flow.SharedFlow<String> = _refreshError.asSharedFlow()
+
     init {
         observeSyncQueue()
     }
 
-    fun loadSyncQueue() {
+    fun loadSyncQueue(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = SyncQueueUiState.Loading
+            if (isRefresh) {
+                if (_isRefreshing.value) return@launch
+                _isRefreshing.value = true
+                android.util.Log.d("APPBAR_REFRESH", "Screen: SyncQueue\nAPI request started")
+            } else {
+                _uiState.value = SyncQueueUiState.Loading
+            }
             val result = getPendingSyncQueueUseCase()
             
             if (result.isSuccess) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: SyncQueue\nAPI response: 200\nState updated")
                 _syncQueue.value = result.getOrNull()
                 _uiState.value = SyncQueueUiState.Success
             } else {
-                _uiState.value = SyncQueueUiState.Error(result.exceptionOrNull()?.message ?: "Failed to load sync queue")
+                if (isRefresh && _uiState.value is SyncQueueUiState.Success) {
+                    _refreshError.emit("Unable to refresh data. Please try again.")
+                } else {
+                    _uiState.value = SyncQueueUiState.Error(result.exceptionOrNull()?.message ?: "Failed to load sync queue")
+                }
+            }
+            _isRefreshing.value = false
+            if (isRefresh) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: SyncQueue\nRefresh completed")
             }
         }
     }

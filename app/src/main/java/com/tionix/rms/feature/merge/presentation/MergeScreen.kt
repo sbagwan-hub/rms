@@ -53,8 +53,17 @@ fun MergeScreen(
     val session = currentSession
     val destBox = destinationBox
     val dupError = duplicateError
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshError.collect { errorMsg ->
+            snackbarHostState.showSnackbar(errorMsg)
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Merge") },
@@ -64,9 +73,10 @@ fun MergeScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.loadAssignedMerges() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
+                    com.tionix.rms.ui.components.RMSRefreshIconButton(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.loadAssignedMerges(isRefresh = true) }
+                    )
                     
                     if (session != null) {
                         IconButton(onClick = { viewModel.resetMerge() }) {

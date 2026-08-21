@@ -55,8 +55,17 @@ fun SegregationScreen(
     val session = currentSession
     val srcBox = sourceBox
     val valError = validationError
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(Unit) {
+        viewModel.refreshError.collect { errorMsg ->
+            snackbarHostState.showSnackbar(errorMsg)
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Segregation") },
@@ -66,9 +75,10 @@ fun SegregationScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.loadAssignedSegregations() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh")
-                    }
+                    com.tionix.rms.ui.components.RMSRefreshIconButton(
+                        isRefreshing = isRefreshing,
+                        onRefresh = { viewModel.loadAssignedSegregations(isRefresh = true) }
+                    )
                     
                     if (session != null) {
                         IconButton(onClick = { viewModel.resetSegregation() }) {

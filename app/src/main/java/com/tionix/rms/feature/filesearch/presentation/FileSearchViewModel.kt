@@ -124,8 +124,10 @@ class FileSearchViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            if (isRefresh && _fileDetail.value != null) {
+            if (isRefresh) {
+                if (_isRefreshing.value) return@launch
                 _isRefreshing.value = true
+                android.util.Log.d("APPBAR_REFRESH", "Screen: FileDetail\nAPI request started")
             } else {
                 _uiState.value = FileSearchUiState.Loading
             }
@@ -133,17 +135,21 @@ class FileSearchViewModel @Inject constructor(
             val result = getFileDetailUseCase(cleanId)
             
             if (result.isSuccess) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: FileDetail\nAPI response: 200\nState updated")
                 _fileDetail.value = result.getOrNull()
                 _uiState.value = FileSearchUiState.FileDetailLoaded
             } else {
                 val errMsg = result.exceptionOrNull()?.message ?: "Failed to load file details"
                 if (isRefresh && _fileDetail.value != null) {
-                    _refreshError.emit("Unable to refresh file details. Please try again.")
+                    _refreshError.emit("Unable to refresh data. Please try again.")
                 } else {
                     _uiState.value = FileSearchUiState.Error(errMsg)
                 }
             }
             _isRefreshing.value = false
+            if (isRefresh) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: FileDetail\nRefresh completed")
+            }
         }
     }
 

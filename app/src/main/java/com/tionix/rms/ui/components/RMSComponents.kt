@@ -166,7 +166,12 @@ fun RMSRefreshIconButton(
     tint: Color = MaterialTheme.colorScheme.onSurface
 ) {
     IconButton(
-        onClick = onRefresh,
+        onClick = {
+            if (!isRefreshing) {
+                android.util.Log.d("APPBAR_REFRESH", "Callback triggered")
+                onRefresh()
+            }
+        },
         enabled = !isRefreshing,
         modifier = modifier
     ) {

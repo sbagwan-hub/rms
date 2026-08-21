@@ -12,8 +12,11 @@ import com.tionix.rms.feature.merge.domain.model.SessionStatus
 import com.tionix.rms.feature.merge.domain.repository.MergeRepository
 import com.tionix.rms.feature.merge.domain.usecase.*
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -74,17 +77,39 @@ class MergeViewModel @Inject constructor(
         }
     }
 
-    fun loadAssignedMerges() {
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _refreshError = kotlinx.coroutines.flow.MutableSharedFlow<String>()
+    val refreshError: kotlinx.coroutines.flow.SharedFlow<String> = _refreshError.asSharedFlow()
+
+    fun loadAssignedMerges(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = MergeUiState.Loading
+            if (isRefresh) {
+                if (_isRefreshing.value) return@launch
+                _isRefreshing.value = true
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Merge\nAPI request started")
+            } else {
+                _uiState.value = MergeUiState.Loading
+            }
+
             val result = repository.getAssignedMerges()
             
             if (result.isSuccess) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Merge\nAPI response: 200\nState updated")
                 _uiState.value = MergeUiState.Success(result.getOrNull() ?: emptyList())
             } else {
-                _uiState.value = MergeUiState.Error(
-                    result.exceptionOrNull()?.message ?: "Failed to load merges"
-                )
+                if (isRefresh && _uiState.value is MergeUiState.Success) {
+                    _refreshError.emit("Unable to refresh data. Please try again.")
+                } else {
+                    _uiState.value = MergeUiState.Error(
+                        result.exceptionOrNull()?.message ?: "Failed to load merges"
+                    )
+                }
+            }
+            _isRefreshing.value = false
+            if (isRefresh) {
+                android.util.Log.d("APPBAR_REFRESH", "Screen: Merge\nRefresh completed")
             }
         }
     }
