@@ -7,8 +7,7 @@ import javax.inject.Inject
 class MoveFileUseCase @Inject constructor(
     private val repository: SegregationRepository
 ) {
-    suspend operator fun invoke(fileBarcode: String): Result<FileRecord> {
-        // TODO: BACKEND ENDPOINT PENDING
-        return repository.moveFile(fileBarcode)
+    suspend operator fun invoke(sessionId: String = "", fileBarcode: String): Result<FileRecord> {
+        return repository.moveFile(sessionId, fileBarcode)
     }
 }

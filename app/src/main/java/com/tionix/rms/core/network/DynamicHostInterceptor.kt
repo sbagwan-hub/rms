@@ -39,30 +39,49 @@ class DynamicHostInterceptor @Inject constructor(
     }
 
     override fun intercept(chain: Interceptor.Chain): Response {
-        var request = chain.request()
+        val originalRequest = chain.request()
         val configuredUrl = runBlocking { appSettingsStore.getServerUrl() }
 
-        var targetUrl = configuredUrl
-        if (!isEmulator()) {
-            if (targetUrl.isNullOrBlank()) {
-                targetUrl = com.tionix.rms.BuildConfig.API_BASE_URL
-            } else if (targetUrl.contains("10.0.2.2") || request.url.host == "10.0.2.2") {
-                targetUrl = targetUrl.replace("10.0.2.2", "192.168.1.7")
-            }
+        var primaryUrl = configuredUrl
+        if (primaryUrl.isNullOrBlank()) {
+            primaryUrl = com.tionix.rms.BuildConfig.API_BASE_URL
         }
 
-        if (!targetUrl.isNullOrBlank()) {
-            val parsedUrl = targetUrl.toHttpUrlOrNull()
-            if (parsedUrl != null) {
-                val originalUrl = request.url
-                val newUrl = originalUrl.newBuilder()
-                    .scheme(parsedUrl.scheme)
-                    .host(parsedUrl.host)
-                    .port(parsedUrl.port)
-                    .build()
-                request = request.newBuilder().url(newUrl).build()
+        val parsedPrimary = primaryUrl.toHttpUrlOrNull()
+        val primaryRequest = if (parsedPrimary != null) {
+            originalRequest.newBuilder()
+                .url(
+                    originalRequest.url.newBuilder()
+                        .scheme(parsedPrimary.scheme)
+                        .host(parsedPrimary.host)
+                        .port(parsedPrimary.port)
+                        .build()
+                )
+                .build()
+        } else {
+            originalRequest
+        }
+
+        return try {
+            chain.proceed(primaryRequest)
+        } catch (e: java.io.IOException) {
+            val fallbackHost = when (primaryRequest.url.host) {
+                "127.0.0.1", "localhost" -> "192.168.1.7"
+                "192.168.1.7" -> "127.0.0.1"
+                else -> null
+            }
+
+            if (fallbackHost != null) {
+                val fallbackUrl = primaryRequest.url.newBuilder().host(fallbackHost).build()
+                val fallbackRequest = primaryRequest.newBuilder().url(fallbackUrl).build()
+                try {
+                    chain.proceed(fallbackRequest)
+                } catch (_: java.io.IOException) {
+                    throw e
+                }
+            } else {
+                throw e
             }
         }
-        return chain.proceed(request)
     }
 }

@@ -13,35 +13,35 @@ data class FileDetailResponseEnvelope(
 )
 
 data class FileDetailDto(
-    val id: String,
-    val barcode: String,
-    val title: String,
+    val id: String = "",
+    val barcode: String = "",
+    val title: String = "",
     val clientName: String? = null,
     val fileType: String? = null,
-    val parentBox: ParentBoxDto,
-    val locationChain: List<String>,
-    val status: String,
-    val movementHistory: List<MovementEventDto>,
-    val createdAt: String,
-    val updatedAt: String?
+    val parentBox: ParentBoxDto = ParentBoxDto(),
+    val locationChain: List<String> = emptyList(),
+    val status: String = "ACTIVE",
+    val movementHistory: List<MovementEventDto> = emptyList(),
+    val createdAt: String = "",
+    val updatedAt: String? = null
 )
 
 data class ParentBoxDto(
-    val id: String,
-    val barcode: String,
-    val name: String?,
-    val location: String,
+    val id: String = "",
+    val barcode: String = "",
+    val name: String? = null,
+    val location: String = "Unassigned",
     val warehouse: String? = null
 )
 
 data class MovementEventDto(
-    val id: String,
-    val eventType: String,
-    val fromLocation: String?,
-    val toLocation: String?,
-    val timestamp: String,
-    val performedBy: String,
-    val notes: String?
+    val id: String = "",
+    val eventType: String = "",
+    val fromLocation: String? = null,
+    val toLocation: String? = null,
+    val timestamp: String = "",
+    val performedBy: String = "",
+    val notes: String? = null
 )
 
 fun FileDetailDto.toDomain(): FileDetail = FileDetail(

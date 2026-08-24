@@ -60,10 +60,10 @@ class FileSearchRepositoryImpl @Inject constructor(
 
     override suspend fun getFileDetail(fileId: String): Result<FileDetail> {
         return try {
-            val cleanId = fileId.trim().replace("\r", "").replace("\n", "").replace("\t", "")
+            val cleanId = fileId.trim().replace("\r", "").replace("\n", "").replace("\t", "").uppercase()
             val response = apiService.getFileDetail(cleanId)
-            if (response.isSuccessful && response.body()?.data != null) {
-                Result.success(response.body()!!.data!!.toDomain())
+            if (response.isSuccessful && response.body() != null) {
+                Result.success(response.body()!!.toDomain())
             } else {
                 val errorMsg = parseErrorMessage(response)
                 Result.failure(Exception(if (errorMsg.isNotBlank()) errorMsg else "File barcode $cleanId was not found in the system."))

@@ -9,6 +9,7 @@ import com.tionix.rms.core.scanner.domain.usecase.StartScanningUseCase
 import com.tionix.rms.core.scanner.domain.usecase.StopScanningUseCase
 import com.tionix.rms.feature.segregation.domain.model.Box
 import com.tionix.rms.feature.segregation.domain.model.FileRecord
+import com.tionix.rms.feature.segregation.domain.model.Segregation
 import com.tionix.rms.feature.segregation.domain.model.SegregationSession
 import com.tionix.rms.feature.segregation.domain.model.SessionStatus
 import com.tionix.rms.feature.segregation.domain.repository.SegregationRepository
@@ -56,12 +57,21 @@ class SegregationViewModel @Inject constructor(
     private val _validationError = MutableStateFlow<FileRecord?>(null)
     val validationError: StateFlow<FileRecord?> = _validationError.asStateFlow()
 
+    private val _statusMessage = MutableStateFlow<String?>(null)
+    val statusMessage: StateFlow<String?> = _statusMessage.asStateFlow()
+
     private val _isOffline = MutableStateFlow(false)
     val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
 
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _refreshError = MutableSharedFlow<String>()
+    val refreshError: SharedFlow<String> = _refreshError.asSharedFlow()
+
     init {
         loadAssignedSegregations()
-        
+
         // Collect scanner results for continuous scanning
         viewModelScope.launch {
             scannerRepository.scanResults.collect { result ->
@@ -71,26 +81,23 @@ class SegregationViewModel @Inject constructor(
     }
 
     private fun handleScannerResult(barcode: String) {
+        val cleanBarcode = barcode.trim().replace("\r", "").replace("\n", "").uppercase()
+        if (cleanBarcode.isBlank()) return
+
         val session = _currentSession.value ?: return
         when (session.status) {
             SessionStatus.SCANNING_SOURCE -> {
-                scanSourceBox(barcode)
+                scanSourceBox(cleanBarcode)
             }
             SessionStatus.SCANNING_TARGET -> {
-                scanTargetBox(barcode)
+                scanTargetBox(cleanBarcode)
             }
             SessionStatus.MOVING_FILES -> {
-                moveFile(barcode)
+                moveFile(cleanBarcode)
             }
             else -> {}
         }
     }
-
-    private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
-
-    private val _refreshError = kotlinx.coroutines.flow.MutableSharedFlow<String>()
-    val refreshError: kotlinx.coroutines.flow.SharedFlow<String> = _refreshError.asSharedFlow()
 
     fun loadAssignedSegregations(isRefresh: Boolean = false) {
         viewModelScope.launch {
@@ -103,7 +110,7 @@ class SegregationViewModel @Inject constructor(
             }
 
             val result = repository.getAssignedSegregations()
-            
+
             if (result.isSuccess) {
                 android.util.Log.d("APPBAR_REFRESH", "Screen: Segregation\nAPI response: 200\nState updated")
                 _uiState.value = SegregationUiState.Success(result.getOrNull() ?: emptyList())
@@ -127,34 +134,58 @@ class SegregationViewModel @Inject constructor(
         _scannedBarcode.value = value
     }
 
-    fun startSegregation() {
+    fun openAssignedSegregation(segregation: Segregation) {
         viewModelScope.launch {
-            val result = startSegregationSessionUseCase()
+            _currentSession.value = null
+            _sourceBox.value = null
+            _targetBox.value = null
+            _validationError.value = null
+            _statusMessage.value = null
+            _uiState.value = SegregationUiState.Loading
+
+            android.util.Log.d("SEGREGATION_FLOW", "Opening segregation: ${segregation.id} (${segregation.segregationCode})")
+            val result = repository.getSegregationDetails(segregation.id)
             if (result.isSuccess) {
-                _currentSession.value = result.getOrNull()
+                val session = result.getOrNull()!!
+                android.util.Log.d(
+                    "SEGREGATION_FLOW",
+                    "Loaded session ${session.id}: Expected Old Box = ${session.sourceBox.barcode} (${session.sourceBox.id}), New Box = ${session.targetBox?.barcode} (${session.targetBox?.id})"
+                )
+                _currentSession.value = session.copy(status = SessionStatus.SCANNING_SOURCE)
+                _sourceBox.value = session.sourceBox
+                _targetBox.value = session.targetBox
                 _uiState.value = SegregationUiState.SessionStarted
-                // Start scanner for continuous scanning
+                _statusMessage.value = "Please scan Old Box: ${session.sourceBox.barcode}"
+
                 initializeScannerUseCase()
                 startScanningUseCase()
             } else {
-                _uiState.value = SegregationUiState.Error(result.exceptionOrNull()?.message ?: "Failed to start session")
+                val err = result.exceptionOrNull()?.message ?: "Failed to open segregation session"
+                android.util.Log.e("SEGREGATION_FLOW", "Failed to load session details: $err")
+                _uiState.value = SegregationUiState.Error(err)
             }
         }
     }
 
     fun scanSourceBox(barcode: String) {
         viewModelScope.launch {
-            val result = scanSourceBoxUseCase(barcode)
+            val session = _currentSession.value ?: return@launch
+            val cleanBarcode = barcode.trim().replace("\r", "").replace("\n", "").uppercase()
+            android.util.Log.d("SEGREGATION_FLOW", "Scanning Old Box: input='$cleanBarcode', expected='${session.sourceBox.barcode}'")
+
+            val result = scanSourceBoxUseCase(session.id, cleanBarcode)
             if (result.isSuccess) {
                 _sourceBox.value = result.getOrNull()
-                _currentSession.value = _currentSession.value?.copy(
+                _currentSession.value = session.copy(
                     sourceBox = result.getOrNull()!!,
                     status = SessionStatus.SCANNING_TARGET
                 )
                 _scannedBarcode.value = ""
+                _statusMessage.value = "Old Box verified. Please scan Destination Box: ${session.targetBox?.barcode ?: ""}"
                 beepPlayer.positive()
             } else {
-                _uiState.value = SegregationUiState.Error(result.exceptionOrNull()?.message ?: "Failed to scan source box")
+                val errMsg = result.exceptionOrNull()?.message ?: "Wrong old box. Please scan ${session.sourceBox.barcode}."
+                _statusMessage.value = errMsg
                 beepPlayer.error()
             }
         }
@@ -162,24 +193,22 @@ class SegregationViewModel @Inject constructor(
 
     fun scanTargetBox(barcode: String) {
         viewModelScope.launch {
-            val sourceBarcode = _sourceBox.value?.barcode
-            if (barcode.trim() == sourceBarcode?.trim()) {
-                _uiState.value = SegregationUiState.ValidationError("Target box cannot be the same as source box")
-                beepPlayer.error()
-                return@launch
-            }
+            val session = _currentSession.value ?: return@launch
+            val cleanBarcode = barcode.trim().replace("\r", "").replace("\n", "").uppercase()
 
-            val result = scanTargetBoxUseCase(barcode)
+            val result = scanTargetBoxUseCase(session.id, cleanBarcode)
             if (result.isSuccess) {
                 _targetBox.value = result.getOrNull()
-                _currentSession.value = _currentSession.value?.copy(
+                _currentSession.value = session.copy(
                     targetBox = result.getOrNull(),
                     status = SessionStatus.MOVING_FILES
                 )
                 _scannedBarcode.value = ""
+                _statusMessage.value = "Boxes verified! Ready to scan files."
                 beepPlayer.positive()
             } else {
-                _uiState.value = SegregationUiState.Error(result.exceptionOrNull()?.message ?: "Failed to scan target box")
+                val errMsg = result.exceptionOrNull()?.message ?: "Wrong destination box. Please scan ${session.targetBox?.barcode ?: ""}."
+                _statusMessage.value = errMsg
                 beepPlayer.error()
             }
         }
@@ -188,40 +217,31 @@ class SegregationViewModel @Inject constructor(
     fun moveFile(fileBarcode: String) {
         viewModelScope.launch {
             val session = _currentSession.value ?: return@launch
-            val sourceBoxBarcode = session.sourceBox.barcode
-            
+            val cleanBarcode = fileBarcode.trim().replace("\r", "").replace("\n", "").uppercase()
+
             // Duplicate Scan Guard
-            val isDuplicate = session.movedFiles.any { it.barcode == fileBarcode }
+            val isDuplicate = session.movedFiles.any { it.barcode == cleanBarcode }
             if (isDuplicate) {
-                _uiState.value = SegregationUiState.ValidationError("File already scanned/moved")
+                _statusMessage.value = "File $cleanBarcode has already been moved."
                 beepPlayer.error()
                 return@launch
             }
 
-            // Validate file belongs to source box
-            val fileInSource = session.sourceFiles.any { it.barcode == fileBarcode }
-            if (!fileInSource) {
-                // Find the file to show validation error
-                val invalidFile = session.sourceFiles.firstOrNull { it.barcode == fileBarcode } 
-                    ?: FileRecord("", fileBarcode, "Unknown File", sourceBoxBarcode)
-                _validationError.value = invalidFile
-                _uiState.value = SegregationUiState.ValidationError("File does not belong to source box")
-                beepPlayer.error() // Error beep for Out file / mismatch
-                return@launch
-            }
-            
-            val result = moveFileUseCase(fileBarcode)
+            val result = moveFileUseCase(session.id, cleanBarcode)
             if (result.isSuccess) {
                 val movedFile = result.getOrNull()!!
+                val newMovedList = session.movedFiles + movedFile
                 _currentSession.value = session.copy(
-                    sourceFiles = session.sourceFiles.filter { it.barcode != fileBarcode },
-                    movedFiles = session.movedFiles + movedFile
+                    movedFiles = newMovedList,
+                    movedCount = newMovedList.size
                 )
                 _scannedBarcode.value = ""
                 _validationError.value = null
-                beepPlayer.positive() // Positive beep for In file
+                _statusMessage.value = "File $cleanBarcode successfully moved to ${session.targetBox?.barcode ?: ""}."
+                beepPlayer.positive()
             } else {
-                _uiState.value = SegregationUiState.Error(result.exceptionOrNull()?.message ?: "Failed to move file")
+                val errorMsg = result.exceptionOrNull()?.message ?: "Failed to move file $cleanBarcode"
+                _statusMessage.value = errorMsg
                 beepPlayer.error()
             }
         }
@@ -231,37 +251,20 @@ class SegregationViewModel @Inject constructor(
         _validationError.value = null
     }
 
-    fun completeAssignedSegregation(segregationId: String) {
-        viewModelScope.launch {
-            _uiState.value = SegregationUiState.Loading
-            val result = repository.completeSegregation(segregationId)
-            if (result.isSuccess) {
-                loadAssignedSegregations()
-            } else {
-                _uiState.value = SegregationUiState.Error(
-                    result.exceptionOrNull()?.message ?: "Failed to complete segregation"
-                )
-            }
-        }
-    }
-
     fun completeSegregation() {
         viewModelScope.launch {
             val session = _currentSession.value ?: return@launch
-            
-            val result = if (_isOffline.value) {
-                // Show queued state if offline
-                Result.success(Unit)
-            } else {
-                completeSegregationSessionUseCase(session.sessionId)
-            }
-            
+            _uiState.value = SegregationUiState.Loading
+
+            val result = completeSegregationSessionUseCase(session.id)
             if (result.isSuccess) {
                 _uiState.value = SegregationUiState.SegregationCompleted
                 stopScanningUseCase()
                 resetSegregation()
             } else {
-                _uiState.value = SegregationUiState.Error(result.exceptionOrNull()?.message ?: "Failed to complete segregation")
+                _uiState.value = SegregationUiState.Error(
+                    result.exceptionOrNull()?.message ?: "Failed to complete segregation"
+                )
             }
         }
     }
@@ -272,12 +275,14 @@ class SegregationViewModel @Inject constructor(
         _targetBox.value = null
         _scannedBarcode.value = ""
         _validationError.value = null
+        _statusMessage.value = null
         viewModelScope.launch { stopScanningUseCase() }
         loadAssignedSegregations()
     }
 
     fun getRemainingCount(): Int {
-        return _currentSession.value?.sourceFiles?.size ?: 0
+        val session = _currentSession.value ?: return 0
+        return maxOf(0, session.totalFiles - session.movedFiles.size)
     }
 
     fun getMovedCount(): Int {
@@ -286,7 +291,7 @@ class SegregationViewModel @Inject constructor(
 
     fun getTotalCount(): Int {
         val session = _currentSession.value ?: return 0
-        return session.sourceFiles.size + session.movedFiles.size
+        return maxOf(session.totalFiles, session.movedFiles.size)
     }
 
     override fun onCleared() {

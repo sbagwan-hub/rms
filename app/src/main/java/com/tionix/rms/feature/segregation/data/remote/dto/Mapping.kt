@@ -13,15 +13,30 @@ fun StartSegregationRequest.toDto(): StartSegregationRequestDto {
 }
 
 fun SegregationDto.toDomain(): Segregation {
+    val segStatus = try {
+        SegregationStatus.valueOf(status.uppercase())
+    } catch (_: Exception) {
+        if (completedAt != null || status.equals("COMPLETED", ignoreCase = true)) {
+            SegregationStatus.COMPLETED
+        } else {
+            SegregationStatus.IN_PROGRESS
+        }
+    }
+
     return Segregation(
         id = id,
         segregationCode = segregationCode,
         boxBarcode = boxBarcode,
         boxName = boxName,
-        status = SegregationStatus.valueOf(status),
+        oldBoxBarcode = oldBoxBarcode ?: boxBarcode,
+        newBoxBarcode = newBoxBarcode,
+        sourceLocation = sourceLocation,
+        destinationLocation = destinationLocation,
+        status = segStatus,
         reasonCode = reasonCode,
         reason = reason,
         fileCount = fileCount,
+        filesMoved = filesMoved,
         assignedTo = assignedTo,
         startedAt = startedAt,
         completedAt = completedAt,

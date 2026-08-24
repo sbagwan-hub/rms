@@ -7,8 +7,7 @@ import javax.inject.Inject
 class ScanSourceBoxUseCase @Inject constructor(
     private val repository: SegregationRepository
 ) {
-    suspend operator fun invoke(barcode: String): Result<Box> {
-        // TODO: BACKEND ENDPOINT PENDING
-        return repository.scanSourceBox(barcode)
+    suspend operator fun invoke(sessionId: String = "", barcode: String): Result<Box> {
+        return repository.scanSourceBox(sessionId, barcode)
     }
 }

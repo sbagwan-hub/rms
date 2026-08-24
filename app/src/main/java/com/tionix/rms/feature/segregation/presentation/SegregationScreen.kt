@@ -1,10 +1,11 @@
 package com.tionix.rms.feature.segregation.presentation
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,25 +17,28 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.tionix.rms.feature.segregation.domain.model.FileRecord
-import com.tionix.rms.feature.segregation.domain.model.SessionStatus
+import com.tionix.rms.feature.segregation.domain.model.Segregation
 import com.tionix.rms.feature.segregation.domain.model.SegregationStatus
+import com.tionix.rms.feature.segregation.domain.model.SessionStatus
 import com.tionix.rms.ui.common.StepIndicator
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SegregationScreen(
     onBack: () -> Unit,
-    canStartSegregation: Boolean = false, // Role-gated: SUPERVISOR/WAREHOUSE_MANAGER only
+    canStartSegregation: Boolean = false,
     viewModel: SegregationViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val scannedBarcode by viewModel.scannedBarcode.collectAsStateWithLifecycle()
     val currentSession by viewModel.currentSession.collectAsStateWithLifecycle()
-    val context = androidx.compose.ui.platform.LocalContext.current
     val sourceBox by viewModel.sourceBox.collectAsStateWithLifecycle()
     val targetBox by viewModel.targetBox.collectAsStateWithLifecycle()
     val validationError by viewModel.validationError.collectAsStateWithLifecycle()
-    val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
+    val statusMessage by viewModel.statusMessage.collectAsStateWithLifecycle()
+    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
@@ -51,12 +55,7 @@ fun SegregationScreen(
         }
     }
 
-    // Local val captures so smart casts work on delegated properties
     val session = currentSession
-    val srcBox = sourceBox
-    val valError = validationError
-    val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(Unit) {
         viewModel.refreshError.collect { errorMsg ->
@@ -68,9 +67,15 @@ fun SegregationScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Segregation") },
+                title = { Text(if (session != null) "Segregation: ${session.sessionId}" else "Segregation") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        if (session != null) {
+                            viewModel.resetSegregation()
+                        } else {
+                            onBack()
+                        }
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -79,10 +84,10 @@ fun SegregationScreen(
                         isRefreshing = isRefreshing,
                         onRefresh = { viewModel.loadAssignedSegregations(isRefresh = true) }
                     )
-                    
+
                     if (session != null) {
                         IconButton(onClick = { viewModel.resetSegregation() }) {
-                            Icon(Icons.Default.Close, contentDescription = "Cancel")
+                            Icon(Icons.Default.Close, contentDescription = "Exit Session")
                         }
                     }
                 }
@@ -95,401 +100,297 @@ fun SegregationScreen(
                 .padding(paddingValues)
                 .padding(16.dp)
         ) {
-            // Live counters when in segregation flow
             if (session != null) {
+                // In-Session Header & Step Indicator
+                val stepIndex = when (session.status) {
+                    SessionStatus.SCANNING_SOURCE -> 0
+                    SessionStatus.SCANNING_TARGET -> 1
+                    SessionStatus.MOVING_FILES -> 2
+                    SessionStatus.COMPLETED -> 3
+                    else -> 0
+                }
+
+                StepIndicator(
+                    steps = listOf("Old Box", "New Box", "Move Files"),
+                    currentStep = stepIndex,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Status Message / Instruction Banner
+                if (!statusMessage.isNullOrBlank()) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Info,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = statusMessage!!,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
+                // Live Counters Card
                 Card(
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    ),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        CounterItem("Remaining", viewModel.getRemainingCount(), Color(0xFF4CAF50))
-                        CounterItem("Moved", viewModel.getMovedCount(), MaterialTheme.colorScheme.primary)
+                        CounterItem("Remaining", viewModel.getRemainingCount(), Color(0xFFFF9800))
+                        CounterItem("Moved", viewModel.getMovedCount(), Color(0xFF4CAF50))
                         CounterItem("Total", viewModel.getTotalCount(), MaterialTheme.colorScheme.onSurface)
                     }
                 }
-            }
-            
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Start segregation button (when not in flow)
-                if (currentSession == null && canStartSegregation) {
-                    item {
-                        Card {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Text(
-                                    text = "Start New Segregation",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                
-                                Text(
-                                    text = "Scan source box to begin segregation process",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                
-                                Button(
-                                    onClick = { viewModel.startSegregation() },
-                                    modifier = Modifier.fillMaxWidth()
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // Step 1: Scan Source Box
+                    if (session.status == SessionStatus.SCANNING_SOURCE) {
+                        item {
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Icon(Icons.Default.PlayArrow, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Start Segregation")
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Source box scanning
-                if (session != null && session.status == SessionStatus.SCANNING_SOURCE) {
-                    item {
-                        Card {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Text(
-                                    text = "Scan Source Box",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                
-                                Button(
-                                    onClick = {
-                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
-                                            val clean = barcode.trim().uppercase()
-                                            viewModel.onScannedBarcodeChanged(clean)
-                                            viewModel.scanSourceBox(clean)
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Scan Source Box")
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Target box scanning
-                if (session != null && session.status == SessionStatus.SCANNING_TARGET) {
-                    item {
-                        Card {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Text(
-                                    text = "Scan Target Box",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                
-                                if (srcBox != null) {
                                     Text(
-                                        text = "Source: ${srcBox.barcode} - ${srcBox.description}",
-                                        style = MaterialTheme.typography.bodySmall,
+                                        text = "Step 1: Scan Old Box",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Target Old Box: ${session.sourceBox.barcode}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.primary
                                     )
-                                }
-                                
-                                Button(
-                                    onClick = {
-                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
-                                            val clean = barcode.trim().uppercase()
-                                            viewModel.onScannedBarcodeChanged(clean)
-                                            viewModel.scanTargetBox(clean)
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Scan Target Box")
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Show source files
-                    if (session?.sourceFiles?.isNotEmpty() == true) {
-                        item {
-                            Text(
-                                text = "Files in Source Box",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        
-                        items(session.sourceFiles) { file ->
-                            FileCard(file)
-                        }
-                    }
-                }
-                
-                // File movement
-                if (session != null && session.status == SessionStatus.MOVING_FILES) {
-                    item {
-                        Card {
-                            Column(
-                                modifier = Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Text(
-                                    text = "Scan Files to Move",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        text = "Source: ${sourceBox?.barcode}",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                    @Suppress("DEPRECATION")
-                                    Icon(Icons.Default.ArrowForward, contentDescription = null)
-                                    Text(
-                                        text = "Target: ${targetBox?.barcode}",
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                }
-                                
-                                Button(
-                                    onClick = {
-                                        viewModel.scannerRepository.startCameraScan(context) { barcode ->
-                                            val clean = barcode.trim().uppercase()
-                                            viewModel.onScannedBarcodeChanged(clean)
-                                            viewModel.moveFile(clean)
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Icon(Icons.Default.QrCodeScanner, contentDescription = null)
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Scan File to Move")
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Validation error
-                    if (valError != null) {
-                        item {
-                            Card(
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer
-                                )
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = "Validation Error",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onErrorContainer
-                                        )
-                                        Text(
-                                            text = "File does not belong to source box",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onErrorContainer
-                                        )
-                                        Text(
-                                            text = "Barcode: ${valError.barcode}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onErrorContainer
-                                        )
-                                    }
-                                    
-                                    IconButton(onClick = { viewModel.clearValidationError() }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = MaterialTheme.colorScheme.onErrorContainer)
+                                    Button(
+                                        onClick = {
+                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                                val clean = barcode.trim().uppercase()
+                                                viewModel.scanSourceBox(clean)
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Camera Scan Old Box")
                                     }
                                 }
                             }
                         }
                     }
-                    
-                    // Remaining files
-                    if (session?.sourceFiles?.isNotEmpty() == true) {
+
+                    // Step 2: Scan Destination Box
+                    if (session.status == SessionStatus.SCANNING_TARGET) {
                         item {
-                            Text(
-                                text = "Remaining Files (${viewModel.getRemainingCount()})",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        
-                        items(session.sourceFiles) { file ->
-                            FileCard(file)
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        text = "Step 2: Scan Destination Box",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Target New Box: ${session.targetBox?.barcode ?: "Assigned Box"}",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Button(
+                                        onClick = {
+                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                                val clean = barcode.trim().uppercase()
+                                                viewModel.scanTargetBox(clean)
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Camera Scan New Box")
+                                    }
+                                }
+                            }
                         }
                     }
-                    
-                    // Moved files
-                    if (session?.movedFiles?.isNotEmpty() == true) {
+
+                    // Step 3: Moving Files
+                    if (session.status == SessionStatus.MOVING_FILES) {
                         item {
-                            Text(
-                                text = "Moved Files (${viewModel.getMovedCount()})",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Card(modifier = Modifier.fillMaxWidth()) {
+                                Column(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Text(
+                                        text = "Step 3: Continuous File Scanning",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Aim Honeywell scanner at file barcodes (MAC...) to move into ${session.targetBox?.barcode ?: ""}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+
+                                    Button(
+                                        onClick = {
+                                            viewModel.scannerRepository.startCameraScan(context) { barcode ->
+                                                val clean = barcode.trim().uppercase()
+                                                viewModel.moveFile(clean)
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(Icons.Default.QrCodeScanner, contentDescription = null)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Camera Scan File")
+                                    }
+                                }
+                            }
                         }
-                        
-                        items(session.movedFiles) { file ->
-                            FileCard(file, isMoved = true)
-                        }
-                    }
-                    
-                    // Complete button when no files remaining
-                    if (session?.sourceFiles?.isEmpty() == true && session.movedFiles.isNotEmpty()) {
+
+                        // Complete Segregation Button
                         item {
                             Button(
                                 onClick = { viewModel.completeSegregation() },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (isOffline) Color(0xFFFF9800) else Color(0xFF4CAF50)
+                                    containerColor = Color(0xFF4CAF50)
                                 )
                             ) {
-                                Icon(Icons.Default.CloudUpload, contentDescription = null)
+                                Icon(Icons.Default.CheckCircle, contentDescription = null)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(if (isOffline) "Queue for Sync" else "Complete Segregation")
+                                Text("Complete Segregation Session")
+                            }
+                        }
+
+                        // Moved Files List
+                        if (session.movedFiles.isNotEmpty()) {
+                            item {
+                                Text(
+                                    text = "Recently Moved Files (${session.movedFiles.size})",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            items(session.movedFiles.reversed()) { file ->
+                                FileCard(file, isMoved = true)
                             }
                         }
                     }
                 }
-                
-                // Completed state
-                if (uiState is SegregationUiState.SegregationCompleted) {
-                    item {
-                        Card(
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color(0xFF4CAF50)
-                            )
+            } else {
+                // Assigned Segregations List Screen
+                when (val state = uiState) {
+                    is SegregationUiState.Loading -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator()
+                        }
+                    }
+                    is SegregationUiState.Error -> {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
                         ) {
                             Column(
-                                modifier = Modifier.padding(24.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                Icon(
-                                    Icons.Default.CheckCircle,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(64.dp)
-                                )
-                                
                                 Text(
-                                    text = "Segregation Completed",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold
+                                    text = state.message,
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodyMedium
                                 )
-                                
-                                Text(
-                                    text = "All files have been moved to the target box",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color.White
-                                )
-                                
-                                Button(
-                                    onClick = { viewModel.resetSegregation() },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-                                ) {
-                                    Text("Done", color = Color(0xFF4CAF50))
+                                Button(onClick = { viewModel.loadAssignedSegregations() }) {
+                                    Text("Retry")
                                 }
                             }
                         }
                     }
-                }
-                
-                // Assigned Segregations (when not in flow)
-                if (currentSession == null) {
-                    item {
-                        Text(
-                            text = "Assigned Segregations",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                    
-                    when (val state = uiState) {
-                        is SegregationUiState.Loading -> {
-                            item {
-                                Box(
-                                    modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                    contentAlignment = Alignment.Center
+                    is SegregationUiState.Success -> {
+                        if (state.segregations.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    CircularProgressIndicator()
+                                    Icon(
+                                        Icons.Default.Inbox,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(48.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "No assigned segregations",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
-                        }
-                        is SegregationUiState.Success -> {
-                            if (state.segregations.isEmpty()) {
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
                                 item {
-                                    Card(
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Box(
-                                            modifier = Modifier.fillMaxWidth().padding(32.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = "No assigned segregations",
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
+                                    Text(
+                                        text = "Assigned Segregations (${state.segregations.size})",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
-                            } else {
+
                                 items(state.segregations) { segregation ->
                                     SegregationCard(
                                         segregation = segregation,
-                                        onComplete = { viewModel.completeAssignedSegregation(segregation.id) }
+                                        onClick = { viewModel.openAssignedSegregation(segregation) }
                                     )
                                 }
                             }
                         }
-                        is SegregationUiState.Error -> {
-                            item {
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = MaterialTheme.colorScheme.errorContainer
-                                    )
-                                ) {
-                                    Box(
-                                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = state.message,
-                                            color = MaterialTheme.colorScheme.onErrorContainer
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        else -> {}
                     }
+                    else -> {}
                 }
             }
         }
@@ -517,7 +418,7 @@ private fun FileCard(file: FileRecord, isMoved: Boolean = false) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = if (isMoved) MaterialTheme.colorScheme.primaryContainer else CardDefaults.cardColors().containerColor
+            containerColor = if (isMoved) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
         )
     ) {
         Row(
@@ -527,22 +428,22 @@ private fun FileCard(file: FileRecord, isMoved: Boolean = false) {
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = file.title,
+                    text = file.barcode,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Barcode: ${file.barcode}",
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Text(
-                    text = "Box: ${file.boxBarcode}",
+                    text = file.title,
                     style = MaterialTheme.typography.bodySmall
                 )
             }
-            
+
             if (isMoved) {
-                Icon(Icons.Default.CheckCircle, contentDescription = "Moved", tint = MaterialTheme.colorScheme.primary)
+                Icon(
+                    Icons.Default.CheckCircle,
+                    contentDescription = "Moved",
+                    tint = MaterialTheme.colorScheme.primary
+                )
             }
         }
     }
@@ -550,17 +451,22 @@ private fun FileCard(file: FileRecord, isMoved: Boolean = false) {
 
 @Composable
 private fun SegregationCard(
-    segregation: com.tionix.rms.feature.segregation.domain.model.Segregation,
-    onComplete: () -> Unit
+    segregation: Segregation,
+    onClick: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+    ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = segregation.segregationCode,
@@ -569,55 +475,39 @@ private fun SegregationCard(
                 )
                 StatusBadge(segregation.status)
             }
-            
-            Text(
-                text = segregation.boxBarcode,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            
-            if (segregation.boxName != null) {
-                Text(
-                    text = segregation.boxName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = "File Count: ${segregation.fileCount}",
-                    style = MaterialTheme.typography.bodySmall
+                    text = "From: ${segregation.oldBoxBarcode ?: segregation.boxBarcode}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
                 )
-                if (segregation.reasonCode != null) {
-                    Text(
-                        text = "Reason: ${segregation.reasonCode}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-            
-            if (segregation.reason != null) {
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Text(
-                    text = segregation.reason,
+                    text = "To: ${segregation.newBoxBarcode ?: "New Box"}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Moved: ${segregation.filesMoved} / ${segregation.fileCount} files",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-            }
-            
-            if (segregation.status == SegregationStatus.IN_PROGRESS) {
-                Button(
-                    onClick = onComplete,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Check, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Complete Segregation")
-                }
+                Text(
+                    text = segregation.sourceLocation ?: "Warehouse",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }
@@ -629,17 +519,18 @@ private fun StatusBadge(status: SegregationStatus) {
         SegregationStatus.PENDING -> MaterialTheme.colorScheme.tertiary to "Pending"
         SegregationStatus.IN_PROGRESS -> MaterialTheme.colorScheme.secondary to "In Progress"
         SegregationStatus.COMPLETED -> Color(0xFF4CAF50) to "Completed"
-        SegregationStatus.FAILED -> MaterialTheme.colorScheme.error to "Failed"
+        SegregationStatus.CANCELLED -> MaterialTheme.colorScheme.outline to "Cancelled"
     }
-    
+
     Surface(
-        color = color.copy(alpha = 0.1f),
+        color = color.copy(alpha = 0.12f),
         shape = MaterialTheme.shapes.small
     ) {
         Text(
             text = label,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
             color = color
         )
     }

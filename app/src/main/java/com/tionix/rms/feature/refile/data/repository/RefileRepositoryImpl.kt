@@ -19,11 +19,16 @@ class RefileRepositoryImpl @Inject constructor(
             if (!errorBody.isNullOrEmpty()) {
                 val json = org.json.JSONObject(errorBody)
                 if (json.has("error")) {
-                    val errObj = json.getJSONObject("error")
-                    errObj.optString("message", "")
-                } else {
+                    val err = json.get("error")
+                    if (err is org.json.JSONObject) {
+                        val msg = err.optString("message", "")
+                        if (msg.isNotBlank()) msg else err.optString("code", "")
+                    } else {
+                        err.toString()
+                    }
+                } else if (json.has("message")) {
                     json.optString("message", "")
-                }
+                } else ""
             } else ""
         } catch (e: Exception) {
             ""
@@ -70,14 +75,31 @@ class RefileRepositoryImpl @Inject constructor(
     }
 
     private fun cleanBarcodeString(b: String): String =
-        b.trim().replace("\r", "").replace("\n", "").replace("\t", "")
+        b.trim().replace("\r", "").replace("\n", "").replace("\t", "").uppercase()
 
     override suspend fun scanFile(barcode: String): Result<FileRecord> {
         return try {
             val cleanBarcode = cleanBarcodeString(barcode)
+            val chars = cleanBarcode.map { "${it.code}" }.joinToString(",")
+            val isBox = cleanBarcode.startsWith("BX", ignoreCase = true)
+            val detectedType = if (isBox) "BOX" else "FILE"
+            val isValid = !isBox && cleanBarcode.isNotBlank()
+
+            android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] (scanFile) RAW VALUE: $barcode")
+            android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] (scanFile) NORMALIZED VALUE: $cleanBarcode")
+            android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] (scanFile) LENGTH: ${cleanBarcode.length}")
+            android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] (scanFile) CHARACTER CODES: $chars")
+            android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] (scanFile) BARCODE TYPE: $detectedType")
+            android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] (scanFile) VALIDATION RESULT: $isValid")
+            android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] (scanFile) API BARCODE: $cleanBarcode")
+
+            if (isBox) {
+                return Result.failure(Exception("Invalid barcode. Please scan a File barcode."))
+            }
+
             val response = searchApiService.getFileDetail(cleanBarcode)
-            if (response.isSuccessful && response.body()?.data != null) {
-                val detail = response.body()!!.data!!
+            if (response.isSuccessful && response.body() != null) {
+                val detail = response.body()!!
                 val location = Location(
                     id = if (detail.parentBox.id.isNotBlank()) detail.parentBox.id else detail.id,
                     barcode = detail.parentBox.location,
@@ -103,7 +125,7 @@ class RefileRepositoryImpl @Inject constructor(
                 Result.success(fileRecord)
             } else {
                 val errorMsg = parseErrorMessage(response)
-                Result.failure(Exception(if (errorMsg.isNotBlank()) errorMsg else "File barcode $cleanBarcode is not registered. Please register the file before refiling."))
+                Result.failure(Exception(if (errorMsg.isNotBlank()) errorMsg else "File barcode $cleanBarcode was not found in the system."))
             }
         } catch (e: Exception) {
             Result.failure(Exception(ErrorUtils.getFriendlyErrorMessage(e)))

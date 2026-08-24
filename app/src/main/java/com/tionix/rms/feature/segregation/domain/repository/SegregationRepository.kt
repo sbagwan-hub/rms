@@ -8,13 +8,14 @@ import com.tionix.rms.feature.segregation.domain.model.StartSegregationRequest
 
 interface SegregationRepository {
     suspend fun getAssignedSegregations(): Result<List<Segregation>>
+    suspend fun getSegregationDetails(id: String): Result<SegregationSession>
     suspend fun startSegregation(request: StartSegregationRequest): Result<Segregation>
     suspend fun completeSegregation(segregationId: String): Result<Unit>
     suspend fun scanBox(barcode: String): Result<Segregation?>
     suspend fun startSegregationSession(): Result<SegregationSession>
-    suspend fun scanSourceBox(barcode: String): Result<Box>
-    suspend fun scanTargetBox(barcode: String): Result<Box>
-    suspend fun moveFile(fileBarcode: String): Result<FileRecord>
+    suspend fun scanSourceBox(sessionId: String, barcode: String): Result<Box>
+    suspend fun scanTargetBox(sessionId: String, barcode: String): Result<Box>
+    suspend fun moveFile(sessionId: String, fileBarcode: String): Result<FileRecord>
     suspend fun completeSegregationSession(sessionId: String): Result<Unit>
     suspend fun syncSegregationToQueue(sessionId: String): Result<Unit>
 }

@@ -21,7 +21,7 @@ interface SearchApiService {
     suspend fun getBoxDetail(@Path("id") boxId: String): Response<BoxDetailDto>
 
     @GET("search/files/{id}")
-    suspend fun getFileDetail(@Path("id") fileId: String): Response<com.tionix.rms.feature.filesearch.data.remote.dto.FileDetailResponseEnvelope>
+    suspend fun getFileDetail(@Path("id") fileId: String): Response<com.tionix.rms.feature.filesearch.data.remote.dto.FileDetailDto>
 
     @retrofit2.http.POST("search/boxes/{id}/files")
     suspend fun insertFile(

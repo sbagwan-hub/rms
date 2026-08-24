@@ -78,21 +78,44 @@ class RefileViewModel @Inject constructor(
         // Collect scanner results for continuous scanning in both batch and normal modes
         viewModelScope.launch {
             scannerRepository.scanResults.collect { result ->
-                val cleanBarcode = result.barcode.trim().replace("\r", "").replace("\n", "").replace("\t", "").uppercase()
+                val raw = result.rawData ?: result.barcode
+                val cleanBarcode = raw.trim().replace("\r", "").replace("\n", "").replace("\t", "").uppercase()
                 if (cleanBarcode.isBlank()) return@collect
+                
+                val chars = cleanBarcode.map { "${it.code}" }.joinToString(",")
+                val isBox = cleanBarcode.startsWith("BX", ignoreCase = true)
+                val detectedType = if (isBox) "BOX" else "FILE"
+                val isWaitingForBox = _currentFile.value != null && _uiState.value !is RefileUiState.RefileSuccess
+                val isValid = if (isWaitingForBox) isBox else !isBox
+
+                android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] RAW VALUE: $raw")
+                android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] NORMALIZED VALUE: $cleanBarcode")
+                android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] LENGTH: ${cleanBarcode.length}")
+                android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] CHARACTER CODES: $chars")
+                android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] BARCODE TYPE: $detectedType")
+                android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] VALIDATION RESULT: $isValid")
+                android.util.Log.d("REFILE_SCAN", "[REFILE_SCAN] API BARCODE: $cleanBarcode")
+
                 if (_batchMode.value) {
                     handleScannerResult(cleanBarcode)
                 } else {
-                    if (_uiState.value is RefileUiState.RefileSuccess) {
-                        // Previous refile completed, start next file scan immediately
+                    if (_uiState.value is RefileUiState.RefileSuccess || _currentFile.value == null) {
+                        if (isBox) {
+                            _uiState.value = RefileUiState.Error("Invalid barcode. Please scan a File barcode.")
+                            beepPlayer.error()
+                            return@collect
+                        }
                         _currentFile.value = null
                         _destinationBoxBarcode.value = ""
                         _scannedBarcode.value = cleanBarcode
                         scanFile()
-                    } else if (_currentFile.value == null) {
-                        _scannedBarcode.value = cleanBarcode
-                        scanFile()
                     } else {
+                        // File already scanned, expecting target box
+                        if (!isBox) {
+                            _uiState.value = RefileUiState.Error("Invalid box barcode. Please scan a box barcode.")
+                            beepPlayer.error()
+                            return@collect
+                        }
                         _destinationBoxBarcode.value = cleanBarcode
                         confirmRefile()
                     }
@@ -108,12 +131,23 @@ class RefileViewModel @Inject constructor(
     private fun handleScannerResult(barcode: String) {
         val cleanBarcode = barcode.trim().replace("\r", "").replace("\n", "").replace("\t", "").uppercase()
         if (cleanBarcode.isBlank()) return
+        val isBox = cleanBarcode.startsWith("BX", ignoreCase = true)
         when (scanStep) {
             ScanStep.FILE -> {
+                if (isBox) {
+                    _uiState.value = RefileUiState.Error("Invalid barcode. Please scan a File barcode.")
+                    beepPlayer.error()
+                    return
+                }
                 _scannedBarcode.value = cleanBarcode
                 scanFile()
             }
             ScanStep.DESTINATION_BOX -> {
+                if (!isBox) {
+                    _uiState.value = RefileUiState.Error("Invalid box barcode. Please scan a box barcode.")
+                    beepPlayer.error()
+                    return
+                }
                 _destinationBoxBarcode.value = cleanBarcode
                 confirmRefile()
             }
@@ -268,7 +302,7 @@ class RefileViewModel @Inject constructor(
                     scanStep = ScanStep.FILE
                 } else {
                     _uiState.value = RefileUiState.RefileSuccess(
-                        message = "File $fileBarcode successfully refiled.",
+                        message = "File $fileBarcode successfully refiled from $fromBoxBarcode to $toBoxBarcode.",
                         fileBarcode = fileBarcode,
                         fromBox = fromBoxBarcode,
                         toBox = toBoxBarcode
@@ -277,7 +311,7 @@ class RefileViewModel @Inject constructor(
             } else {
                 val errMsg = result.exceptionOrNull()?.message ?: "Refile failed"
                 android.util.Log.w("REFILE", "[REFILE] refile response: FAILURE ($errMsg)")
-                if (errMsg.contains("LOCATION_MISMATCH", ignoreCase = true) || errMsg.contains("wrong location", ignoreCase = true)) {
+                if (errMsg.contains("LOCATION_MISMATCH", ignoreCase = true) || errMsg.contains("wrong location", ignoreCase = true) || errMsg.contains("wrong box", ignoreCase = true) || errMsg.contains("mismatch", ignoreCase = true)) {
                     _showMismatchDialog.value = true
                 } else {
                     _showMismatchDialog.value = false
